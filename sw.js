@@ -1,9 +1,9 @@
-// PLANO.BARRIGA — Service Worker
+// DIÁRIO.FIT — Service Worker
 // Cache do app shell pra funcionar offline.
 // Estratégia: stale-while-revalidate pros assets estáticos, network-first pra análise de IA.
 
-const VERSION = "v2.0.1";
-const CACHE = "planobarriga-" + VERSION;
+const VERSION = "v2.0.2";
+const CACHE = "diariofit-" + VERSION;
 
 const SHELL = [
   "./",
@@ -26,7 +26,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith("planobarriga-") && k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => (k.startsWith("diariofit-") || k.startsWith("planobarriga-")) && k !== CACHE).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -63,5 +63,4 @@ self.addEventListener("fetch", (event) => {
 
 // Permite mensagens pra forçar update
 self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") self.skipWaiting();
-});
+  if (event.data === "SKIP_WAITING
