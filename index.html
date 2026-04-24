@@ -56,45 +56,48 @@
   const WD = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
   const MO = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
+  // Prescrição: Prof. Mateus Cabral Araujo — SESC Açude Velho (05/01/2026)
   const PLAN = {
-    0: { l: "Descanso", ex: [], s: "Caminhada 30-45min" },
-    1: { l: "Peito+Tríceps", ex: [
-      { n: "Supino reto", s: "4x10-12", k: 4 },
-      { n: "Crucifixo", s: "4x10-12", k: 4 },
-      { n: "Tríceps corda", s: "4x12", k: 4 },
-      { n: "Mergulho", s: "3x falha", k: 3 },
-      { n: "Flexão", s: "3x12", k: 3 },
-    ], s: "Corrida HIIT 25min" },
-    2: { l: "Costas+Bíceps", ex: [
-      { n: "Barra fixa", s: "4x max", k: 4 },
-      { n: "Remada curvada", s: "4x10-12", k: 4 },
-      { n: "Pulldown", s: "4x12", k: 4 },
-      { n: "Rosca direta", s: "3x12", k: 3 },
-      { n: "Rosca martelo", s: "3x12", k: 3 },
-    ], s: "Ciclismo 40min" },
-    3: { l: "Pernas+Glúteos", ex: [
-      { n: "Agachamento", s: "4x12-15", k: 4 },
-      { n: "Leg press", s: "4x12-15", k: 4 },
-      { n: "Stiff", s: "4x12", k: 4 },
-      { n: "Cadeira extensora", s: "3x15", k: 3 },
-      { n: "Elevação quadril", s: "3x15", k: 3 },
-    ], s: "Corrida leve 35min" },
-    4: { l: "Ombro+Core", ex: [
-      { n: "Desenvolvimento", s: "4x10-12", k: 4 },
-      { n: "Elevação lateral", s: "4x12-15", k: 4 },
-      { n: "Face pull", s: "3x15", k: 3 },
-      { n: "Prancha", s: "3x45s", k: 3 },
-      { n: "Abdominal bicicleta", s: "3x20", k: 3 },
-      { n: "Russian twist", s: "3x20", k: 3 },
-    ], s: "Ciclismo HIIT 30min" },
-    5: { l: "Full Body", ex: [
-      { n: "Terra (deadlift)", s: "4x8-10", k: 4 },
-      { n: "Agachamento frontal", s: "3x10", k: 3 },
-      { n: "Remada unilateral", s: "3x12", k: 3 },
-      { n: "Desenvolvimento halter", s: "3x12", k: 3 },
-      { n: "Abdominal prancha", s: "3x45s", k: 3 },
-    ], s: "Bike leve 30min" },
-    6: { l: "Cardio Longo", ex: [], s: "Ciclismo 75-90min" },
+    0: { l: "Descanso", ex: [], s: "Caminhada leve 30-45min ou alongamento" },
+    1: { l: "Treino 1 · Sup.A — Costas+Ombro+Bíceps", ex: [
+      { n: "Cárdio aquecimento", s: "1 × 10min", k: 1 },
+      { n: "Puxada Superior", s: "4 × 12", k: 4 },
+      { n: "Rem. Peso Corp. Pronada", s: "4 × 15", k: 4 },
+      { n: "Rem. Curvada c/ Halteres", s: "4 × 15", k: 4 },
+      { n: "Desenv. c/ Halteres", s: "4 × 15", k: 4 },
+      { n: "Elevação Lateral", s: "4 × 15", k: 4 },
+      { n: "Rosca Scott", s: "4 × 15", k: 4 },
+      { n: "Rosca Direta c/ Barra", s: "4 × 15", k: 4 },
+    ], s: "Descanso 1min entre séries" },
+    2: { l: "Treino 2 · Inf.A — Pernas+Panturrilha", ex: [
+      { n: "Cárdio aquecimento", s: "1 × 10min", k: 1 },
+      { n: "Panturrilha Sentado", s: "4 × 10", k: 4 },
+      { n: "Abdutora", s: "4 × 10", k: 4 },
+      { n: "Afundo", s: "4 × 15", k: 4 },
+      { n: "Agach. c/ Halteres", s: "4 × 15", k: 4 },
+      { n: "Leg Press 45°", s: "4 × 15", k: 4 },
+      { n: "Extensora", s: "4 × 15", k: 4 },
+    ], s: "Descanso 1min entre séries" },
+    3: { l: "Treino 3 · Sup.B — Costas+Peito+Tríceps", ex: [
+      { n: "Cárdio aquecimento", s: "1 × 10min", k: 1 },
+      { n: "Remada Articulada Neutra", s: "4 × 15", k: 4 },
+      { n: "Supino Inclinado Halteres", s: "4 × 15", k: 4 },
+      { n: "Supino Reto", s: "4 × 15", k: 4 },
+      { n: "Desenv. c/ Halteres", s: "4 × 15", k: 4 },
+      { n: "Tríceps Francês Unilateral", s: "4 × 15", k: 4 },
+      { n: "Tríceps Testa (Cross)", s: "4 × 15", k: 4 },
+    ], s: "Descanso 1min entre séries" },
+    4: { l: "Treino 4 · Inf.B — Glúteo+Posterior", ex: [
+      { n: "Cárdio aquecimento", s: "1 × 10min", k: 1 },
+      { n: "Panturrilha Vertical Uni.", s: "4 × 15", k: 4 },
+      { n: "Abdutora", s: "4 × 15", k: 4 },
+      { n: "Elevação Pélvica", s: "4 × 15", k: 4 },
+      { n: "Stiff", s: "4 × 15", k: 4 },
+      { n: "Agach. c/ Halteres", s: "4 × 15", k: 4 },
+      { n: "Afundo", s: "4 × 15", k: 4 },
+    ], s: "Descanso 1min entre séries" },
+    5: { l: "Descanso ativo", ex: [], s: "Caminhada ou bike leve 30min" },
+    6: { l: "Cardio Longo", ex: [], s: "Ciclismo 60-75min ou corrida 45min" },
   };
 
   const C = {
@@ -728,17 +731,18 @@
   // ==================== Plan Tab ====================
   function PlanTab() {
     const days = [
-      { n: "Segunda", t: "Peito+Tríceps", ex: ["Supino reto 4x10-12", "Crucifixo 4x10-12", "Tríceps corda 4x12", "Mergulho 3x falha", "Flexão 3x12"], c: "Corrida HIIT 25min" },
-      { n: "Terça", t: "Costas+Bíceps", ex: ["Barra fixa 4x max", "Remada curvada 4x10-12", "Pulldown 4x12", "Rosca direta 3x12", "Rosca martelo 3x12"], c: "Ciclismo 40min" },
-      { n: "Quarta", t: "Pernas+Glúteos", ex: ["Agachamento 4x12-15", "Leg press 4x12-15", "Stiff 4x12", "Cadeira extensora 3x15", "Elevação quadril 3x15"], c: "Corrida leve 35min" },
-      { n: "Quinta", t: "Ombro+Core", ex: ["Desenvolvimento 4x10-12", "Elevação lateral 4x12-15", "Face pull 3x15", "Prancha 3x45s", "Abdominal bicicleta 3x20", "Russian twist 3x20"], c: "Ciclismo HIIT 30min" },
-      { n: "Sexta", t: "Full Body", ex: ["Terra (deadlift) 4x8-10", "Agachamento frontal 3x10", "Remada unilateral 3x12", "Desenvolvimento halter 3x12", "Abdominal prancha 3x45s"], c: "Bike leve 30min" },
-      { n: "Sábado", t: "Cardio Longo", ex: [], c: "Ciclismo 75-90min" },
-      { n: "Domingo", t: "Descanso", ex: [], c: "Caminhada ou alongamento" },
+      { n: "Segunda", t: "Treino 1 · Sup.A — Costas+Ombro+Bíceps", ex: ["Cárdio aquecimento 10min", "Puxada Superior 4×12", "Rem. Peso Corp. Pronada 4×15", "Rem. Curvada c/ Halteres 4×15", "Desenv. c/ Halteres 4×15", "Elevação Lateral 4×15", "Rosca Scott 4×15", "Rosca Direta c/ Barra 4×15"], c: "Descanso 1min entre séries" },
+      { n: "Terça", t: "Treino 2 · Inf.A — Pernas+Panturrilha", ex: ["Cárdio aquecimento 10min", "Panturrilha Sentado 4×10", "Abdutora 4×10", "Afundo 4×15", "Agach. c/ Halteres 4×15", "Leg Press 45° 4×15", "Extensora 4×15"], c: "Descanso 1min entre séries" },
+      { n: "Quarta", t: "Treino 3 · Sup.B — Costas+Peito+Tríceps", ex: ["Cárdio aquecimento 10min", "Remada Articulada Neutra 4×15", "Supino Inclinado Halteres 4×15", "Supino Reto 4×15", "Desenv. c/ Halteres 4×15", "Tríceps Francês Uni. 4×15", "Tríceps Testa (Cross) 4×15"], c: "Descanso 1min entre séries" },
+      { n: "Quinta", t: "Treino 4 · Inf.B — Glúteo+Posterior", ex: ["Cárdio aquecimento 10min", "Panturrilha Vertical Uni. 4×15", "Abdutora 4×15", "Elevação Pélvica 4×15", "Stiff 4×15", "Agach. c/ Halteres 4×15", "Afundo 4×15"], c: "Descanso 1min entre séries" },
+      { n: "Sexta", t: "Descanso ativo", ex: [], c: "Caminhada ou bike leve 30min" },
+      { n: "Sábado", t: "Cardio Longo", ex: [], c: "Ciclismo 60-75min ou corrida 45min" },
+      { n: "Domingo", t: "Descanso", ex: [], c: "Caminhada leve ou alongamento" },
     ];
     return (
       <div>
-        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 12 }}>PLANO SEMANAL</div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 4 }}>PLANO SEMANAL</div>
+        <div style={{ fontSize: 10, color: C.m, marginBottom: 12, fontStyle: "italic" }}>Prescrição: Prof. Mateus Cabral Araujo — SESC Açude Velho · 05/01/2026</div>
         {days.map((p) => (
           <div key={p.n} style={boxS}>
             <div style={{ fontSize: 17, fontWeight: 900, color: C.t }}>{p.n}</div>
@@ -958,27 +962,4 @@
             Exporta tudo (dados, fotos, medidas) num arquivo JSON pra você salvar.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button onClick={handleExport} style={{ ...btnPrimary(C.blue), padding: 10, fontSize: 12 }}>↓ EXPORTAR</button>
-            <button onClick={() => fileRef.current.click()} style={{ ...btnPrimary(C.yellow), padding: 10, fontSize: 12 }}>↑ IMPORTAR</button>
-            <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => handleImport(e.target.files[0])} />
-          </div>
-        </div>
-
-        <button onClick={reset} style={{ ...btnPrimary(C.red), marginTop: 8, padding: 10, fontSize: 12 }}>RESETAR CONFIGURAÇÕES</button>
-
-        <div style={{ marginTop: 20, textAlign: "center", fontSize: 10, color: C.m }}>
-          DIÁRIO.FIT v2 · Dados 100% locais
-        </div>
-      </div>
-    );
-  }
-
-  // ==================== Mount ====================
-  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-  </script>
-
-  <script>
-    // Service Worker registration
-    if ("serviceWorker" in navigator && location.protocol !== "file:") {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW registration failed:", e));
+            <button onClick={handleExpor
