@@ -47,7 +47,7 @@
     TARGET: 2200,
     EK: 8,
     WEIGHT: 85,
-    PROXY_URL: "https://diariofit-proxy.romarioproxxima.workers.dev",
+    PROXY_URL: "",
     MEAL_NAMES: ["Café da manhã", "Pré/Pós Treino", "Almoço", "Jantar"],
     MEAL_TIMES: ["07h-08h", "11h-12h30", "14h-15h", "19h-20h"],
   };
@@ -56,7 +56,6 @@
   const WD = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
   const MO = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-  // Prescrição: Prof. Mateus Cabral Araujo — SESC Açude Velho (05/01/2026)
   const PLAN = {
     0: { l: "Descanso", ex: [], s: "Caminhada leve 30-45min ou alongamento" },
     1: { l: "Treino 1 · Sup.A — Costas+Ombro+Bíceps", ex: [
@@ -71,30 +70,31 @@
     ], s: "Descanso 1min entre séries" },
     2: { l: "Treino 2 · Inf.A — Pernas+Panturrilha", ex: [
       { n: "Cárdio aquecimento", s: "1 × 10min", k: 1 },
-      { n: "Panturrilha Sentado", s: "4 × 10", k: 4 },
-      { n: "Abdutora", s: "4 × 10", k: 4 },
-      { n: "Afundo", s: "4 × 15", k: 4 },
-      { n: "Agach. c/ Halteres", s: "4 × 15", k: 4 },
+      { n: "Cadeira Extensora", s: "4 × 15", k: 4 },
+      { n: "Agachamento no Smith", s: "4 × 15", k: 4 },
       { n: "Leg Press 45°", s: "4 × 15", k: 4 },
-      { n: "Extensora", s: "4 × 15", k: 4 },
+      { n: "Mesa Flexora", s: "4 × 15", k: 4 },
+      { n: "Cadeira Adutora", s: "4 × 15", k: 4 },
+      { n: "Panturrilha em Pé", s: "4 × 20", k: 4 },
+      { n: "Panturrilha Sentado", s: "4 × 20", k: 4 },
     ], s: "Descanso 1min entre séries" },
     3: { l: "Treino 3 · Sup.B — Costas+Peito+Tríceps", ex: [
       { n: "Cárdio aquecimento", s: "1 × 10min", k: 1 },
-      { n: "Remada Articulada Neutra", s: "4 × 15", k: 4 },
-      { n: "Supino Inclinado Halteres", s: "4 × 15", k: 4 },
-      { n: "Supino Reto", s: "4 × 15", k: 4 },
-      { n: "Desenv. c/ Halteres", s: "4 × 15", k: 4 },
-      { n: "Tríceps Francês Unilateral", s: "4 × 15", k: 4 },
-      { n: "Tríceps Testa (Cross)", s: "4 × 15", k: 4 },
+      { n: "Remada Sentado", s: "4 × 15", k: 4 },
+      { n: "Pulldown c/ Triângulo", s: "4 × 12", k: 4 },
+      { n: "Crucifixo Máquina", s: "4 × 15", k: 4 },
+      { n: "Supino Inclinado Halteres", s: "4 × 12", k: 4 },
+      { n: "Tríceps Corda", s: "4 × 15", k: 4 },
+      { n: "Tríceps Francês", s: "4 × 12", k: 4 },
     ], s: "Descanso 1min entre séries" },
     4: { l: "Treino 4 · Inf.B — Glúteo+Posterior", ex: [
       { n: "Cárdio aquecimento", s: "1 × 10min", k: 1 },
-      { n: "Panturrilha Vertical Uni.", s: "4 × 15", k: 4 },
-      { n: "Abdutora", s: "4 × 15", k: 4 },
+      { n: "Cadeira Abdutora", s: "4 × 15", k: 4 },
+      { n: "Glúteo na Polia", s: "4 × 15", k: 4 },
       { n: "Elevação Pélvica", s: "4 × 15", k: 4 },
-      { n: "Stiff", s: "4 × 15", k: 4 },
-      { n: "Agach. c/ Halteres", s: "4 × 15", k: 4 },
-      { n: "Afundo", s: "4 × 15", k: 4 },
+      { n: "Stiff c/ Barra", s: "4 × 15", k: 4 },
+      { n: "Mesa Flexora", s: "4 × 15", k: 4 },
+      { n: "Agachamento Sumô", s: "4 × 15", k: 4 },
     ], s: "Descanso 1min entre séries" },
     5: { l: "Descanso ativo", ex: [], s: "Caminhada ou bike leve 30min" },
     6: { l: "Cardio Longo", ex: [], s: "Ciclismo 60-75min ou corrida 45min" },
@@ -335,7 +335,6 @@
     const dKey = dkey(cur);
 
     const consumed = meals.reduce((s, m) => s + (m.kcal || 0), 0);
-    // exS[i] pode ser boolean (legado: true = todas séries) ou number (séries feitas)
     const setsDone = (v, k) => (v === true ? k : Math.max(0, Math.min(Number(v) || 0, k)));
     const burned = plan.ex.reduce((s, ex, i) => s + setsDone(exS[i], ex.k) * EK, 0)
       + (extraEx || []).reduce((s, ex) => s + setsDone(ex.done, ex.k || 4) * EK, 0)
@@ -598,69 +597,46 @@
               <button onClick={() => p.setRestTimer(true)} style={{ background: C.s2, border: "1px solid " + C.b, color: C.a, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer" }}>⏱ Descanso</button>
             )}
           </div>
-          {p.plan.ex.length === 0 && (!p.extraEx || p.extraEx.length === 0) ? (
-            <div style={{ fontSize: 12, color: C.m, marginBottom: 8 }}>Sem musculação hoje — pode adicionar exercícios extras abaixo</div>
-          ) : null}
-          {p.plan.ex.length > 0 && (
-            <div style={{ marginBottom: 8 }}>
+          {p.plan.ex.length === 0 && p.extraEx.length === 0 ? (
+            <div style={{ fontSize: 12, color: C.m, marginBottom: 8 }}>Sem musculação hoje (adicione exercícios avulsos abaixo se quiser)</div>
+          ) : (
+            <div style={{ marginBottom: 10 }}>
               {p.plan.ex.map((ex, i) => {
-                const raw = p.exS[i];
-                const doneN = raw === true ? ex.k : Math.max(0, Math.min(Number(raw) || 0, ex.k));
-                const allDone = doneN >= ex.k && ex.k > 0;
-                const partial = doneN > 0 && !allDone;
-                const bg = allDone ? "#a8e06315" : (partial ? "#f5c51812" : C.s2);
-                const br = allDone ? "#a8e06335" : (partial ? "#f5c51830" : C.b);
+                const v = p.exS[i];
+                const doneN = (v === true ? ex.k : Math.max(0, Math.min(Number(v) || 0, ex.k)));
+                const full = doneN === ex.k;
                 return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: bg, border: "1px solid " + br, borderRadius: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, flex: 1, textDecoration: allDone ? "line-through" : "none", color: allDone ? C.m : C.t }}>{ex.n}</span>
-                    <span style={{ fontSize: 9, color: C.a, background: "#a8e06315", padding: "2px 6px", borderRadius: 4, whiteSpace: "nowrap" }}>{ex.s}</span>
-                    <select value={doneN} onChange={(e) => {
-                      const v = Number(e.target.value);
-                      p.setExS((prev) => ({ ...prev, [i]: v }));
-                      p.setSaved(false);
-                    }} style={{ background: C.bg, color: C.t, border: "1px solid " + C.b, borderRadius: 5, fontSize: 11, padding: "3px 4px", cursor: "pointer", fontWeight: 700 }}>
-                      {Array.from({ length: ex.k + 1 }).map((_, n) => <option key={n} value={n}>{n}/{ex.k}</option>)}
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: full ? "#a8e06310" : C.s2, border: "1px solid " + (full ? "#a8e06335" : C.b), borderRadius: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, flex: 1, textDecoration: full ? "line-through" : "none", color: full ? C.m : C.t }}>{ex.n}</span>
+                    <span style={{ fontSize: 9, color: C.a, background: "#a8e06315", padding: "2px 6px", borderRadius: 4 }}>{ex.s}</span>
+                    <select value={doneN} onChange={(e) => { const n = Number(e.target.value); p.setExS((prev) => ({ ...prev, [i]: n })); p.setSaved(false); }}
+                      style={{ background: C.bg, color: doneN > 0 ? C.a : C.m, border: "1px solid " + C.b, borderRadius: 6, padding: "3px 5px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      {Array.from({ length: ex.k + 1 }, (_, n) => <option key={n} value={n}>{n}/{ex.k}</option>)}
                     </select>
                   </div>
                 );
               })}
-            </div>
-          )}
-          {p.extraEx && p.extraEx.length > 0 && (
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, marginTop: 4 }}>+ Extras do dia</div>
               {p.extraEx.map((ex, i) => {
-                const k = Number(ex.k) || 4;
-                const doneN = Math.max(0, Math.min(Number(ex.done) || 0, k));
-                const allDone = doneN >= k;
-                const partial = doneN > 0 && !allDone;
-                const bg = allDone ? "#a8e06315" : (partial ? "#f5c51812" : C.s2);
-                const br = allDone ? "#a8e06335" : (partial ? "#f5c51830" : C.b);
+                const v = ex.done;
+                const k = ex.k || 4;
+                const doneN = (v === true ? k : Math.max(0, Math.min(Number(v) || 0, k)));
+                const full = doneN === k;
                 return (
-                  <div key={"x" + i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: bg, border: "1px solid " + br, borderRadius: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, flex: 1, textDecoration: allDone ? "line-through" : "none", color: allDone ? C.m : C.t }}>{ex.n}</span>
-                    <span style={{ fontSize: 9, color: C.a, background: "#a8e06315", padding: "2px 6px", borderRadius: 4, whiteSpace: "nowrap" }}>{ex.s}</span>
-                    <select value={doneN} onChange={(e) => {
-                      const v = Number(e.target.value);
-                      p.setExtraEx((prev) => { const a = [...prev]; a[i] = { ...a[i], done: v }; return a; });
-                      p.setSaved(false);
-                    }} style={{ background: C.bg, color: C.t, border: "1px solid " + C.b, borderRadius: 5, fontSize: 11, padding: "3px 4px", cursor: "pointer", fontWeight: 700 }}>
-                      {Array.from({ length: k + 1 }).map((_, n) => <option key={n} value={n}>{n}/{k}</option>)}
+                  <div key={"x" + i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: full ? "#ff6b3510" : C.s2, border: "1px solid " + (full ? "#ff6b3535" : C.b), borderRadius: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, flex: 1, textDecoration: full ? "line-through" : "none", color: full ? C.m : C.t }}>{ex.n}</span>
+                    <span style={{ fontSize: 9, color: C.a3, background: "#ff6b3515", padding: "2px 6px", borderRadius: 4 }}>{ex.s}</span>
+                    <select value={doneN} onChange={(e) => { const n = Number(e.target.value); p.setExtraEx((prev) => prev.map((x, j) => j === i ? { ...x, done: n } : x)); p.setSaved(false); }}
+                      style={{ background: C.bg, color: doneN > 0 ? C.a3 : C.m, border: "1px solid " + C.b, borderRadius: 6, padding: "3px 5px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      {Array.from({ length: k + 1 }, (_, n) => <option key={n} value={n}>{n}/{k}</option>)}
                     </select>
-                    <button onClick={() => {
-                      p.setExtraEx((prev) => prev.filter((_, j) => j !== i));
-                      p.setSaved(false);
-                    }} title="Remover" style={{ background: "transparent", color: C.m, border: "none", fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1, width: 20 }}>×</button>
+                    <button onClick={() => { p.setExtraEx((prev) => prev.filter((_, j) => j !== i)); p.setSaved(false); }}
+                      style={{ background: "none", border: "none", color: C.m, fontSize: 15, cursor: "pointer", padding: "0 2px" }}>×</button>
                   </div>
                 );
               })}
             </div>
           )}
-          <AddExerciseForm onAdd={(ex) => {
-            p.setExtraEx((prev) => [...(prev || []), ex]);
-            p.setSaved(false);
-          }} />
-          <div style={{ height: 12 }} />
+          <AddExerciseForm onAdd={(ex) => { p.setExtraEx((prev) => [...prev, ex]); p.setSaved(false); }} />
           <div style={{ fontSize: 13, fontWeight: 700, color: C.t, marginBottom: 6 }}>CARDIO</div>
           <div style={{ fontSize: 11, color: C.m, marginBottom: 8, padding: "6px 9px", background: C.s2, borderRadius: 7, borderLeft: "3px solid " + C.a2 }}>{p.plan.s}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -783,44 +759,41 @@
   // ==================== Add Exercise Form ====================
   function AddExerciseForm({ onAdd }) {
     const [show, setShow] = useState(false);
-    const [n, setN] = useState("");
-    const [s, setS] = useState("4 × 15");
+    const [name, setName] = useState("");
+    const [vol, setVol] = useState("");
     const [k, setK] = useState(4);
 
     function submit() {
-      const nameT = (n || "").trim();
-      if (!nameT) return;
-      onAdd({ n: nameT, s: (s || "").trim() || "—", k: Math.max(1, Math.min(10, Number(k) || 4)), done: 0 });
-      setN(""); setS("4 × 15"); setK(4); setShow(false);
+      const n = name.trim();
+      if (!n) return;
+      onAdd({ n, s: vol.trim() || (k + " × ?"), k: Math.max(1, Math.min(10, Number(k) || 4)), done: 0 });
+      setName(""); setVol(""); setK(4); setShow(false);
     }
 
     if (!show) {
       return (
         <button onClick={() => setShow(true)}
-          style={{ width: "100%", padding: 10, background: "transparent", border: "1px dashed " + C.b, borderRadius: 8, color: C.a, fontSize: 11, cursor: "pointer", letterSpacing: 1, fontWeight: 600 }}>
-          + ADICIONAR EXERCÍCIO
+          style={{ width: "100%", background: C.s2, border: "1px dashed " + C.b, color: C.a, padding: "8px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", marginTop: 6 }}>
+          + Adicionar exercício avulso
         </button>
       );
     }
-
     return (
-      <div style={{ background: C.s2, border: "1px solid " + C.a + "55", borderRadius: 8, padding: 10, marginBottom: 6 }}>
-        <div style={{ fontSize: 10, color: C.a, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6, fontWeight: 700 }}>Novo exercício</div>
-        <input value={n} onChange={(e) => setN(e.target.value)} placeholder="Nome (ex: Abdominal infra)" autoFocus
-          style={{ ...inpS, marginBottom: 6 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 6, marginBottom: 8 }}>
-          <input value={s} onChange={(e) => setS(e.target.value)} placeholder="Volume (ex: 4 × 15)" style={inpS} />
-          <input type="number" min="1" max="10" value={k} onChange={(e) => setK(e.target.value)} placeholder="Séries" style={inpS} />
+      <div style={{ background: C.s2, border: "1px solid " + C.b, borderRadius: 8, padding: 10, marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: C.m, marginBottom: 6, letterSpacing: 0.5 }}>NOVO EXERCÍCIO</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Abdominal infra"
+          style={{ width: "100%", background: C.bg, border: "1px solid " + C.b, borderRadius: 7, padding: "7px 9px", color: C.t, fontSize: 12, marginBottom: 6, boxSizing: "border-box" }} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: 6, marginBottom: 8 }}>
+          <input value={vol} onChange={(e) => setVol(e.target.value)} placeholder="Ex: 4 × 12"
+            style={{ background: C.bg, border: "1px solid " + C.b, borderRadius: 7, padding: "7px 9px", color: C.t, fontSize: 12, boxSizing: "border-box" }} />
+          <input type="number" value={k} min="1" max="10" onChange={(e) => setK(e.target.value)} placeholder="Séries"
+            style={{ background: C.bg, border: "1px solid " + C.b, borderRadius: 7, padding: "7px 9px", color: C.t, fontSize: 12, boxSizing: "border-box" }} />
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={submit} disabled={!n.trim()}
-            style={{ flex: 1, padding: 9, background: n.trim() ? C.a : C.b, color: n.trim() ? C.bg : C.m, border: "none", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: n.trim() ? "pointer" : "not-allowed", letterSpacing: 1 }}>
-            ADICIONAR
-          </button>
-          <button onClick={() => { setShow(false); setN(""); setS("4 × 15"); setK(4); }}
-            style={{ padding: "9px 14px", background: "transparent", color: C.m, border: "1px solid " + C.b, borderRadius: 7, fontSize: 11, cursor: "pointer" }}>
-            Cancelar
-          </button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          <button onClick={submit}
+            style={{ background: C.a, color: C.bg, border: "none", borderRadius: 7, padding: "8px 10px", fontSize: 12, fontWeight: 900, cursor: "pointer" }}>ADICIONAR</button>
+          <button onClick={() => { setShow(false); setName(""); setVol(""); setK(4); }}
+            style={{ background: "transparent", color: C.m, border: "1px solid " + C.b, borderRadius: 7, padding: "8px 10px", fontSize: 12, cursor: "pointer" }}>Cancelar</button>
         </div>
       </div>
     );
@@ -829,18 +802,17 @@
   // ==================== Plan Tab ====================
   function PlanTab() {
     const days = [
-      { n: "Segunda", t: "Treino 1 · Sup.A — Costas+Ombro+Bíceps", ex: ["Cárdio aquecimento 10min", "Puxada Superior 4×12", "Rem. Peso Corp. Pronada 4×15", "Rem. Curvada c/ Halteres 4×15", "Desenv. c/ Halteres 4×15", "Elevação Lateral 4×15", "Rosca Scott 4×15", "Rosca Direta c/ Barra 4×15"], c: "Descanso 1min entre séries" },
-      { n: "Terça", t: "Treino 2 · Inf.A — Pernas+Panturrilha", ex: ["Cárdio aquecimento 10min", "Panturrilha Sentado 4×10", "Abdutora 4×10", "Afundo 4×15", "Agach. c/ Halteres 4×15", "Leg Press 45° 4×15", "Extensora 4×15"], c: "Descanso 1min entre séries" },
-      { n: "Quarta", t: "Treino 3 · Sup.B — Costas+Peito+Tríceps", ex: ["Cárdio aquecimento 10min", "Remada Articulada Neutra 4×15", "Supino Inclinado Halteres 4×15", "Supino Reto 4×15", "Desenv. c/ Halteres 4×15", "Tríceps Francês Uni. 4×15", "Tríceps Testa (Cross) 4×15"], c: "Descanso 1min entre séries" },
-      { n: "Quinta", t: "Treino 4 · Inf.B — Glúteo+Posterior", ex: ["Cárdio aquecimento 10min", "Panturrilha Vertical Uni. 4×15", "Abdutora 4×15", "Elevação Pélvica 4×15", "Stiff 4×15", "Agach. c/ Halteres 4×15", "Afundo 4×15"], c: "Descanso 1min entre séries" },
+      { n: "Domingo", t: "Descanso", ex: [], c: "Caminhada leve 30-45min ou alongamento" },
+      { n: "Segunda", t: "Treino 1 · Sup.A — Costas+Ombro+Bíceps", ex: ["Cárdio aquecimento 1×10min", "Puxada Superior 4×12", "Rem. Peso Corp. Pronada 4×15", "Rem. Curvada c/ Halteres 4×15", "Desenv. c/ Halteres 4×15", "Elevação Lateral 4×15", "Rosca Scott 4×15", "Rosca Direta c/ Barra 4×15"], c: "Descanso 1min entre séries" },
+      { n: "Terça", t: "Treino 2 · Inf.A — Pernas+Panturrilha", ex: ["Cárdio aquecimento 1×10min", "Cadeira Extensora 4×15", "Agachamento no Smith 4×15", "Leg Press 45° 4×15", "Mesa Flexora 4×15", "Cadeira Adutora 4×15", "Panturrilha em Pé 4×20", "Panturrilha Sentado 4×20"], c: "Descanso 1min entre séries" },
+      { n: "Quarta", t: "Treino 3 · Sup.B — Costas+Peito+Tríceps", ex: ["Cárdio aquecimento 1×10min", "Remada Sentado 4×15", "Pulldown c/ Triângulo 4×12", "Crucifixo Máquina 4×15", "Supino Inclinado Halteres 4×12", "Tríceps Corda 4×15", "Tríceps Francês 4×12"], c: "Descanso 1min entre séries" },
+      { n: "Quinta", t: "Treino 4 · Inf.B — Glúteo+Posterior", ex: ["Cárdio aquecimento 1×10min", "Cadeira Abdutora 4×15", "Glúteo na Polia 4×15", "Elevação Pélvica 4×15", "Stiff c/ Barra 4×15", "Mesa Flexora 4×15", "Agachamento Sumô 4×15"], c: "Descanso 1min entre séries" },
       { n: "Sexta", t: "Descanso ativo", ex: [], c: "Caminhada ou bike leve 30min" },
       { n: "Sábado", t: "Cardio Longo", ex: [], c: "Ciclismo 60-75min ou corrida 45min" },
-      { n: "Domingo", t: "Descanso", ex: [], c: "Caminhada leve ou alongamento" },
     ];
     return (
       <div>
-        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 4 }}>PLANO SEMANAL</div>
-        <div style={{ fontSize: 10, color: C.m, marginBottom: 12, fontStyle: "italic" }}>Prescrição: Prof. Mateus Cabral Araujo — SESC Açude Velho · 05/01/2026</div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 12 }}>PLANO SEMANAL</div>
         {days.map((p) => (
           <div key={p.n} style={boxS}>
             <div style={{ fontSize: 17, fontWeight: 900, color: C.t }}>{p.n}</div>
@@ -934,4 +906,159 @@
             <div key={i} style={{ ...boxS, marginBottom: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
                 <div style={{ fontSize: 10, color: C.m }}>📅 {item.date}</div>
-                <button onClick={() => delProgEntry(i)} style={{ background: "none", border: "none", color: C.m, fontSize: 11, cursor: "pointer" 
+                <button onClick={() => delProgEntry(i)} style={{ background: "none", border: "none", color: C.m, fontSize: 11, cursor: "pointer" }}>×</button>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {[["peso", "kg"], ["cintura", "cm"], ["abdomen", "cm"], ["quadril", "cm"]].map(([f, u]) => {
+                  if (item[f] == null) return null;
+                  const dv = prev && prev[f] != null ? item[f] - prev[f] : null;
+                  return (
+                    <div key={f} style={{ fontSize: 12 }}>
+                      {f}: <strong style={{ color: C.a }}>{item[f]}{u}</strong>
+                      {dv != null && <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 4, marginLeft: 2, background: dv < 0 ? "#a8e06318" : "#e74c3c15", color: dv < 0 ? C.a : C.red }}>{dv > 0 ? "+" : ""}{dv.toFixed(1)}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ==================== Config Tab ====================
+  function ConfigTab({ settings, setSettings, showT }) {
+    const [s, setS] = useState(settings);
+    const fileRef = useRef(null);
+
+    function update(k, v) { setS((p) => ({ ...p, [k]: v })); }
+    function updateMeal(i, field, v) {
+      setS((p) => {
+        const next = { ...p };
+        next[field] = [...p[field]];
+        next[field][i] = v;
+        return next;
+      });
+    }
+
+    function save() {
+      const clean = {
+        ...s,
+        TDEE: Number(s.TDEE) || DEFAULTS.TDEE,
+        TARGET: Number(s.TARGET) || DEFAULTS.TARGET,
+        WEIGHT: Number(s.WEIGHT) || DEFAULTS.WEIGHT,
+        PROXY_URL: (s.PROXY_URL || "").trim(),
+      };
+      setSettings(clean);
+      showT("Configurações salvas");
+    }
+
+    async function handleExport() {
+      try { await exportAll(); showT("Backup baixado"); }
+      catch (e) { showT("Erro: " + e.message); }
+    }
+
+    async function handleImport(file) {
+      if (!file) return;
+      if (!confirm("Importar vai sobrescrever dados atuais. Continuar?")) return;
+      try {
+        await importAll(file);
+        showT("Importado! Recarregue.");
+        setTimeout(() => location.reload(), 1200);
+      } catch (e) { showT("Erro: " + e.message); }
+    }
+
+    function reset() {
+      if (!confirm("Resetar TODAS as configurações ao padrão? (dados não serão apagados)")) return;
+      setS(DEFAULTS);
+      setSettings(DEFAULTS);
+      showT("Configurações resetadas");
+    }
+
+    return (
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 12 }}>CONFIGURAÇÕES</div>
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>MÉTRICAS</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>TDEE (kcal/dia)</div>
+              <input type="number" value={s.TDEE} onChange={(e) => update("TDEE", e.target.value)} style={inpS} />
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Meta (teto kcal)</div>
+              <input type="number" value={s.TARGET} onChange={(e) => update("TARGET", e.target.value)} style={inpS} />
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Peso atual (kg)</div>
+              <input type="number" step="0.1" value={s.WEIGHT} onChange={(e) => update("WEIGHT", e.target.value)} style={inpS} />
+            </div>
+          </div>
+          <div style={{ fontSize: 10, color: C.m, lineHeight: 1.5 }}>
+            Déficit esperado: <strong style={{ color: C.a }}>{(Number(s.TDEE) || 0) - (Number(s.TARGET) || 0)} kcal/dia</strong>
+            {" · "}~{(((Number(s.TDEE) || 0) - (Number(s.TARGET) || 0)) * 7 / 7700).toFixed(2)} kg/semana
+          </div>
+        </div>
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>REFEIÇÕES</div>
+          <div style={{ fontSize: 10, color: C.m, marginBottom: 8 }}>Ajuste nomes e horários conforme sua rotina.</div>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 6, marginBottom: 6 }}>
+              <input value={s.MEAL_NAMES[i]} onChange={(e) => updateMeal(i, "MEAL_NAMES", e.target.value)} style={inpS} />
+              <input value={s.MEAL_TIMES[i]} onChange={(e) => updateMeal(i, "MEAL_TIMES", e.target.value)} style={inpS} placeholder="ex: 07h-08h" />
+            </div>
+          ))}
+        </div>
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>PROXY DA IA</div>
+          <div style={{ fontSize: 10, color: C.m, marginBottom: 6 }}>
+            URL do Cloudflare Worker. Deixa em branco pra desabilitar análise de IA.
+          </div>
+          <input value={s.PROXY_URL} onChange={(e) => update("PROXY_URL", e.target.value)} placeholder="https://plano-barriga-proxy.seudominio.workers.dev" style={inpS} />
+          <div style={{ fontSize: 9, color: C.m, marginTop: 6 }}>Veja <strong>REVIEW.md</strong> para como publicar o proxy.</div>
+        </div>
+
+        <button onClick={save} style={btnPrimary(C.a)}>SALVAR CONFIGURAÇÕES</button>
+
+        <div style={{ height: 18 }} />
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>BACKUP</div>
+          <div style={{ fontSize: 10, color: C.m, marginBottom: 10 }}>
+            Exporta tudo (dados, fotos, medidas) num arquivo JSON pra você salvar.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <button onClick={handleExport} style={{ ...btnPrimary(C.blue), padding: 10, fontSize: 12 }}>↓ EXPORTAR</button>
+            <button onClick={() => fileRef.current.click()} style={{ ...btnPrimary(C.yellow), padding: 10, fontSize: 12 }}>↑ IMPORTAR</button>
+            <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => handleImport(e.target.files[0])} />
+          </div>
+        </div>
+
+        <button onClick={reset} style={{ ...btnPrimary(C.red), marginTop: 8, padding: 10, fontSize: 12 }}>RESETAR CONFIGURAÇÕES</button>
+
+        <div style={{ marginTop: 20, textAlign: "center", fontSize: 10, color: C.m }}>
+          DIÁRIO.FIT v2 · Dados 100% locais
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== Mount ====================
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+
+  <script>
+    // Service Worker registration
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW registration failed:", e));
+      });
+    }
+  </script>
+</body>
+</html>
+      
