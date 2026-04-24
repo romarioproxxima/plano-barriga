@@ -2,7 +2,7 @@
 // Cache do app shell pra funcionar offline.
 // Estratégia: stale-while-revalidate pros assets estáticos, network-first pra análise de IA.
 
-const VERSION = "v2.2.2";
+const VERSION = "v2.2.3";
 const CACHE = "diariofit-" + VERSION;
 
 const SHELL = [
@@ -63,4 +63,5 @@ self.addEventListener("fetch", (event) => {
 
 // Permite mensagens pra forçar update
 self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
+});
