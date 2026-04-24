@@ -636,6 +636,7 @@
               })}
             </div>
           )}
+          <ExerciseFromPlanPicker onAdd={(ex) => { p.setExtraEx((prev) => [...prev, ex]); p.setSaved(false); }} />
           <AddExerciseForm onAdd={(ex) => { p.setExtraEx((prev) => [...prev, ex]); p.setSaved(false); }} />
           <div style={{ fontSize: 13, fontWeight: 700, color: C.t, marginBottom: 6 }}>CARDIO</div>
           <div style={{ fontSize: 11, color: C.m, marginBottom: 8, padding: "6px 9px", background: C.s2, borderRadius: 7, borderLeft: "3px solid " + C.a2 }}>{p.plan.s}</div>
@@ -753,6 +754,37 @@
           );
         })}
       </div>
+    );
+  }
+
+  // ==================== Exercise Picker (from plan) ====================
+  function ExerciseFromPlanPicker({ onAdd }) {
+    const [val, setVal] = useState("");
+    const groups = [
+      { label: "Sup.A — Costas+Ombro+Bíceps", items: PLAN[1].ex },
+      { label: "Inf.A — Pernas+Panturrilha", items: PLAN[2].ex },
+      { label: "Sup.B — Costas+Peito+Tríceps", items: PLAN[3].ex },
+      { label: "Inf.B — Glúteo+Posterior", items: PLAN[4].ex },
+    ];
+    return (
+      <select value={val} onChange={(e) => {
+        const v = e.target.value;
+        if (!v) return;
+        const [gi, xi] = v.split("-").map(Number);
+        const ex = groups[gi].items[xi];
+        onAdd({ n: ex.n, s: ex.s, k: ex.k, done: 0 });
+        setVal("");
+      }}
+        style={{ width: "100%", background: C.s2, border: "1px dashed " + C.b, color: C.a, padding: "8px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", marginTop: 6, appearance: "none", textAlign: "center", textAlignLast: "center" }}>
+        <option value="">+ Adicionar do plano (escolher exercício)</option>
+        {groups.map((g, gi) => (
+          <optgroup key={gi} label={g.label}>
+            {g.items.map((ex, xi) => (
+              <option key={xi} value={gi + "-" + xi}>{ex.n} — {ex.s}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
     );
   }
 
@@ -1061,4 +1093,3 @@
   </script>
 </body>
 </html>
-      
