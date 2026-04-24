@@ -47,7 +47,7 @@
     TARGET: 2200,
     EK: 8,
     WEIGHT: 85,
-    PROXY_URL: "",
+    PROXY_URL: "https://diariofit-proxy.romarioproxxima.workers.dev",
     MEAL_NAMES: ["Café da manhã", "Pré/Pós Treino", "Almoço", "Jantar"],
     MEAL_TIMES: ["07h-08h", "11h-12h30", "14h-15h", "19h-20h"],
   };
@@ -127,7 +127,9 @@
   }
 
   function loadSettings() {
-    return { ...DEFAULTS, ...(LS("barriga_settings") || {}) };
+    const merged = { ...DEFAULTS, ...(LS("barriga_settings") || {}) };
+    if (!merged.PROXY_URL || !merged.PROXY_URL.trim()) merged.PROXY_URL = DEFAULTS.PROXY_URL;
+    return merged;
   }
   function saveSettings(s) { LS("barriga_settings", s); }
 
