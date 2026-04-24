@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0c0f0a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c0f0a'/%3E%3Ctext x='50%25' y='55%25' text-anchor='middle' font-family='system-ui' font-size='34' font-weight='900' fill='%23a8e063'%3EP%3C/text%3E%3Ctext x='72%25' y='55%25' font-family='system-ui' font-size='34' font-weight='900' fill='%23ff6b35'%3E.%3C/text%3E%3C/svg%3E" />
+  <title>PLANO.BARRIGA</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; background: #0c0f0a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { overscroll-behavior-y: contain; }
+    button { font-family: inherit; }
+    input, textarea, select { font-family: inherit; }
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2a3520; border-radius: 3px; }
+    /* Animations */
+    @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .fadein { animation: fadein .3s ease; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse { animation: pulse 1.4s ease-in-out infinite; }
+    /* Loading */
+    .app-loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #a8e063; font-size: 14px; letter-spacing: 2px; }
+  </style>
+
+  <!-- Libraries -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="root"><div class="app-loading">CARREGANDO...</div></div>
+
+  <script type="text/babel" data-presets="react">
+  const { useState, useEffect, useRef, useMemo } = React;
+
+  // ==================== Constants ====================
+  const DEFAULTS = {
+    TDEE: 2600,
+    TARGET: 2200,
+    EK: 8,
+    WEIGHT: 85,
+    PROXY_URL: "",
+    MEAL_NAMES: ["Café da manhã", "Pré/Pós Treino", "Almoço", "Jantar"],
+    MEAL_TIMES: ["07h-08h", "11h-12h30", "14h-15h", "19h-20h"],
+  };
+
+  const CK = { Corrida: 11, Ciclismo: 8, Caminhada: 5, HIIT: 14, "": 0 };
+  const WD = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+  const MO = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+  const PLAN = {
+    0: { l: "Descanso", ex: [], s: "Caminhada 30-45min" },
+    1: { l: "Peito+Tríceps", ex: [
+      { n: "Supino reto", s: "4x10-12", k: 4 },
+      { n: "Crucifixo", s: "4x10-12", k: 4 },
+      { n: "Tríceps corda", s: "4x12", k: 4 },
+      { n: "Mergulho", s: "3x falha", k: 3 },
+      { n: "Flexão", s: "3x12", k: 3 },
+    ], s: "Corrida HIIT 25min" },
+    2: { l: "Costas+Bíceps", ex: [
+      { n: "Barra fixa", s: "4x max", k: 4 },
+      { n: "Remada curvada", s: "4x10-12", k: 4 },
+      { n: "Pulldown", s: "4x12", k: 4 },
+      { n: "Rosca direta", s: "3x12", k: 3 },
+      { n: "Rosca martelo", s: "3x12", k: 3 },
+    ], s: "Ciclismo 40min" },
+    3: { l: "Pernas+Glúteos", ex: [
+      { n: "Agachamento", s: "4x12-15", k: 4 },
+      { n: "Leg press", s: "4x12-15", k: 4 },
+      { n: "Stiff", s: "4x12", k: 4 },
+      { n: "Cadeira extensora", s: "3x15", k: 3 },
+      { n: "Elevação quadril", s: "3x15", k: 3 },
+    ], s: "Corrida leve 35min" },
+    4: { l: "Ombro+Core", ex: [
+      { n: "Desenvolvimento", s: "4x10-12", k: 4 },
+      { n: "Elevação lateral", s: "4x12-15", k: 4 },
+      { n: "Face pull", s: "3x15", k: 3 },
+      { n: "Prancha", s: "3x45s", k: 3 },
+      { n: "Abdominal bicicleta", s: "3x20", k: 3 },
+      { n: "Russian twist", s: "3x20", k: 3 },
+    ], s: "Ciclismo HIIT 30min" },
+    5: { l: "Full Body", ex: [
+      { n: "Terra (deadlift)", s: "4x8-10", k: 4 },
+      { n: "Agachamento frontal", s: "3x10", k: 3 },
+      { n: "Remada unilateral", s: "3x12", k: 3 },
+      { n: "Desenvolvimento halter", s: "3x12", k: 3 },
+      { n: "Abdominal prancha", s: "3x45s", k: 3 },
+    ], s: "Bike leve 30min" },
+    6: { l: "Cardio Longo", ex: [], s: "Ciclismo 75-90min" },
+  };
+
+  const C = {
+    bg: "#0c0f0a", s2: "#1c2416", a: "#a8e063", a2: "#5cb85c", a3: "#ff6b35",
+    t: "#e8f0e0", m: "#6b7d5e", b: "#2a3520", c: "#181f12",
+    red: "#e74c3c", blue: "#3498db", yellow: "#f5c518",
+  };
+
+  const EK = DEFAULTS.EK;
+
+  // ==================== Utils ====================
+  const fmtD = (d) => String(d.getDate()).padStart(2, "0") + " " + MO[d.getMonth()] + " " + d.getFullYear();
+  const dkey = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+
+  function LS(k, v) {
+    if (v === undefined) {
+      try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; }
+    } else {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {
+        console.error("LS write failed", e);
+      }
+    }
+  }
+
+  function emptyM() {
+    return [0, 1, 2, 3].map(() => ({ hasPhoto: false, text: "", kcal: 0, analysis: null, done: false }));
+  }
+
+  function loadSettings() {
+    return { ...DEFAULTS, ...(LS("barriga_settings") || {}) };
+  }
+  function saveSettings(s) { LS("barriga_settings", s); }
+
+  // IndexedDB for photos (saves localStorage quota)
+  const PHOTO_DB = "planobarriga_photos";
+  const PHOTO_STORE = "photos";
+  const photoStore = idbKeyval.createStore(PHOTO_DB, PHOTO_STORE);
+  const photoKey = (dateKey, mealIdx) => `photo_${dateKey}_${mealIdx}`;
+
+  async function savePhoto(k, data) { try { await idbKeyval.set(k, data, photoStore); } catch (e) { console.error(e); } }
+  async function getPhoto(k) { try { return await idbKeyval.get(k, photoStore); } catch { return null; } }
+  async function delPhoto(k) { try { await idbKeyval.del(k, photoStore); } catch {} }
+
+  // Streak: consecutive days in deficit target
+  function computeStreak() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let streak = 0;
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const data = LS("diary_" + dkey(d));
+      if (!data || !data.saved) {
+        if (i === 0) continue; // hoje pode não estar salvo ainda
+        break;
+      }
+      const ok = data.deficit >= 200 && data.deficit <= 700;
+      if (!ok) {
+        if (i === 0) continue;
+        break;
+      }
+      streak++;
+    }
+    return streak;
+  }
+
+  // Export / Import
+  async function exportAll() {
+    const data = { version: 2, ts: Date.now(), ls: {}, photos: {} };
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("diary_") || k.startsWith("barriga_"))) {
+        data.ls[k] = LS(k);
+      }
+    }
+    try {
+      const keys = await idbKeyval.keys(photoStore);
+      for (const k of keys) data.photos[k] = await idbKeyval.get(k, photoStore);
+    } catch (e) { console.warn("no idb", e); }
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "plano-barriga-backup-" + dkey(new Date()) + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importAll(file) {
+    const txt = await file.text();
+    const data = JSON.parse(txt);
+    if (!data.ls) throw new Error("Arquivo inválido");
+    for (const k in data.ls) LS(k, data.ls[k]);
+    if (data.photos) {
+      for (const k in data.photos) await idbKeyval.set(k, data.photos[k], photoStore);
+    }
+  }
+
+  // ==================== Shared styles ====================
+  const boxS = { background: C.c, border: "1px solid " + C.b, borderRadius: 14, padding: 16, marginBottom: 12 };
+  const inpS = { width: "100%", background: C.s2, border: "1px solid " + C.b, borderRadius: 8, padding: "8px 10px", color: C.t, fontSize: 13, outline: "none" };
+  const btnPrimary = (bg = C.a) => ({ width: "100%", padding: 12, background: bg, color: C.bg, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: "pointer" });
+  const chipS = (bg, color) => ({ fontSize: 10, padding: "3px 8px", borderRadius: 6, background: bg, color, fontWeight: 600 });
+
+  // ==================== Rest Timer ====================
+  function RestTimer({ onClose }) {
+    const [secs, setSecs] = useState(60);
+    const [running, setRunning] = useState(false);
+    const [remaining, setRemaining] = useState(60);
+
+    useEffect(() => {
+      if (!running) return;
+      const id = setInterval(() => {
+        setRemaining((r) => {
+          if (r <= 1) {
+            clearInterval(id);
+            setRunning(false);
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            try { new AudioContext(); } catch {}
+            return 0;
+          }
+          return r - 1;
+        });
+      }, 1000);
+      return () => clearInterval(id);
+    }, [running]);
+
+    function start(s) { setSecs(s); setRemaining(s); setRunning(true); }
+    function stop() { setRunning(false); setRemaining(secs); }
+
+    return (
+      <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: C.c, border: "1px solid " + C.a, borderRadius: 14, padding: 14, zIndex: 500, boxShadow: "0 10px 40px rgba(0,0,0,.6)", minWidth: 240 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: C.m, letterSpacing: 1 }}>DESCANSO</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: C.m, fontSize: 18, cursor: "pointer" }}>×</button>
+        </div>
+        <div style={{ fontSize: 42, fontWeight: 900, color: remaining <= 10 && running ? C.a3 : C.a, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
+          {String(Math.floor(remaining / 60)).padStart(2, "0")}:{String(remaining % 60).padStart(2, "0")}
+        </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+          {[60, 90, 120].map((s) => (
+            <button key={s} onClick={() => start(s)} style={{ flex: 1, padding: "7px 0", background: secs === s ? C.a : C.s2, color: secs === s ? C.bg : C.t, border: "none", borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: "pointer" }}>{s}s</button>
+          ))}
+        </div>
+        {running ? (
+          <button onClick={stop} style={{ ...btnPrimary(C.a3), marginTop: 8, padding: 9, fontSize: 12 }}>PARAR</button>
+        ) : (
+          <button onClick={() => setRunning(true)} style={{ ...btnPrimary(C.a), marginTop: 8, padding: 9, fontSize: 12 }}>INICIAR {secs}s</button>
+        )}
+      </div>
+    );
+  }
+
+  // ==================== Photo component ====================
+  function MealPhoto({ dKey, mealIdx, hasPhoto, onChange }) {
+    const [preview, setPreview] = useState(null);
+
+    useEffect(() => {
+      let cancelled = false;
+      if (hasPhoto) {
+        getPhoto(photoKey(dKey, mealIdx)).then((d) => {
+          if (!cancelled) setPreview(d);
+        });
+      } else {
+        setPreview(null);
+      }
+      return () => { cancelled = true; };
+    }, [dKey, mealIdx, hasPhoto]);
+
+    function handleFile(file) {
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = (e) => {
+        const img = new Image();
+        img.onload = async () => {
+          const cv = document.createElement("canvas");
+          const M = 450;
+          let w = img.width, h = img.height;
+          if (w > M) { h = Math.round(h * M / w); w = M; }
+          if (h > M) { w = Math.round(w * M / h); h = M; }
+          cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          const data = cv.toDataURL("image/jpeg", 0.65);
+          await savePhoto(photoKey(dKey, mealIdx), data);
+          setPreview(data);
+          onChange(true);
+        };
+        img.src = e.target.result;
+      };
+      r.readAsDataURL(file);
+    }
+
+    return (
+      <label style={{ display: "block", border: "1.5px " + (hasPhoto ? "solid " + C.a2 : "dashed " + C.b), borderRadius: 9, marginBottom: 8, cursor: "pointer", background: C.s2, overflow: "hidden", position: "relative" }}>
+        {hasPhoto && preview ? (
+          <div style={{ position: "relative" }}>
+            <img src={preview} style={{ width: "100%", maxHeight: 160, objectFit: "cover", display: "block" }} alt="refeição" />
+            <div style={{ position: "absolute", bottom: 6, right: 6, background: "rgba(0,0,0,.7)", color: "#fff", fontSize: 10, padding: "3px 7px", borderRadius: 5 }}>trocar</div>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: 14 }}>
+            <div style={{ fontSize: 22 }}>📷</div>
+            <div style={{ fontSize: 11, color: C.m }}>Toque para foto</div>
+          </div>
+        )}
+        <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
+      </label>
+    );
+  }
+
+  // ==================== App ====================
+  function App() {
+    const [tab, setTab] = useState("diary");
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const [cur, setCur] = useState(today);
+    const [settings, setSettings] = useState(loadSettings);
+    const [exS, setExS] = useState({});
+    const [meals, setMeals] = useState(emptyM());
+    const [water, setWater] = useState(0);
+    const [notes, setNotes] = useState("");
+    const [ctype, setCtype] = useState("");
+    const [cmin, setCmin] = useState("");
+    const [analyzing, setAnalyzing] = useState(null);
+    const [toast, setToast] = useState("");
+    const [saved, setSaved] = useState(false);
+    const [hist, setHist] = useState([]);
+    const [prog, setProg] = useState([]);
+    const [pf, setPf] = useState({ peso: "", cintura: "", abdomen: "", quadril: "" });
+    const [restTimer, setRestTimer] = useState(false);
+    const [streak, setStreak] = useState(0);
+
+    const dow = cur.getDay();
+    const plan = PLAN[dow];
+    const dKey = dkey(cur);
+
+    const consumed = meals.reduce((s, m) => s + (m.kcal || 0), 0);
+    const burned = plan.ex.reduce((s, ex, i) => s + (exS[i] ? ex.k * EK : 0), 0) + Math.round((CK[ctype] || 0) * (parseFloat(cmin) || 0));
+    const deficit = (settings.TDEE + burned) - consumed;
+    const defOk = consumed > 0 && deficit >= 200 && deficit <= 700;
+    const defOver = consumed > 0 && deficit < 200;
+
+    // Aggregate macros
+    const macros = meals.reduce((acc, m) => {
+      if (m.analysis && !m.analysis.error) {
+        acc.p += Number(m.analysis.protein_g) || 0;
+        acc.c += Number(m.analysis.carb_g) || 0;
+        acc.g += Number(m.analysis.fat_g) || 0;
+      }
+      return acc;
+    }, { p: 0, c: 0, g: 0 });
+
+    function showT(m) { setToast(m); setTimeout(() => setToast(""), 3000); }
+
+    function upd(i, u) {
+      setMeals((p) => { const m = [...p]; m[i] = { ...m[i], ...u }; return m; });
+      setSaved(false);
+    }
+
+    // Load day data on date change
+    useEffect(() => {
+      const s = LS("diary_" + dKey) || {};
+      setExS(s.exS || {});
+      setMeals(s.meals || emptyM());
+      setWater(s.water || 0);
+      setNotes(s.notes || "");
+      setCtype(s.ct || "");
+      setCmin(s.cm || "");
+      setSaved(!!s.saved);
+    }, [dKey]);
+
+    // Load history/progress when switching tabs
+    useEffect(() => {
+      if (tab === "hist") {
+        const ks = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith("diary_")) ks.push(k.replace("diary_", ""));
+        }
+        ks.sort((a, b) => b.localeCompare(a));
+        setHist(ks.map((k) => ({ key: k, d: LS("diary_" + k) })).filter((x) => x.d && x.d.saved));
+      }
+      if (tab === "prog") setProg(LS("barriga_progress") || []);
+    }, [tab]);
+
+    // Recompute streak
+    useEffect(() => { setStreak(computeStreak()); }, [saved, tab]);
+
+    // ==================== Analyze ====================
+    async function analyze(i) {
+      if (!settings.PROXY_URL) {
+        showT("Configure URL do proxy em ⚙️");
+        setTab("config");
+        return;
+      }
+      const m = meals[i];
+      if (!m.hasPhoto && !m.text) { showT("Adicione foto ou descrição"); return; }
+      setAnalyzing(i);
+      try {
+        const content = [];
+        if (m.hasPhoto) {
+          const data = await getPhoto(photoKey(dKey, i));
+          if (data) {
+            content.push({
+              type: "image",
+              source: { type: "base64", media_type: "image/jpeg", data: data.split(",")[1] },
+            });
+          }
+        }
+        const mealName = settings.MEAL_NAMES[i] || ("Refeição " + (i + 1));
+        content.push({
+          type: "text",
+          text: `Nutricionista: analise refeição "${mealName}" de pessoa ${settings.WEIGHT}kg, déficit alvo 400kcal, teto ${settings.TARGET}kcal.${m.text ? " Descrição: " + m.text : ""} Responda SOMENTE com JSON válido: {"foods":["item"],"kcal":400,"protein_g":30,"carb_g":40,"fat_g":15,"assessment":"ok","tip":"dica"}`,
+        });
+        const url = settings.PROXY_URL.replace(/\/$/, "") + "/v1/messages";
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 400,
+            messages: [{ role: "user", content }],
+          }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+        const raw = (data.content || []).map((c) => c.text || "").join("").trim();
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error("JSON inválido na resposta");
+        const p = JSON.parse(match[0]);
+        upd(i, { kcal: Number(p.kcal) || 0, analysis: p });
+        showT("Analisado: " + p.kcal + " kcal");
+      } catch (e) {
+        upd(i, { analysis: { error: e.message } });
+        showT("Erro: " + e.message.substring(0, 50));
+      } finally {
+        setAnalyzing(null);
+      }
+    }
+
+    // ==================== Save day ====================
+    function saveDay() {
+      LS("diary_" + dKey, {
+        saved: true, exS, meals, water, notes, ct: ctype, cm: cmin,
+        weekday: WD[dow], label: plan.l,
+        consumed, burned, deficit, macros,
+      });
+      setSaved(true);
+      setStreak(computeStreak());
+      showT("Dia salvo!");
+    }
+
+    function saveProg() {
+      const { peso, cintura, abdomen, quadril } = pf;
+      if (!peso && !cintura && !abdomen && !quadril) { showT("Preencha ao menos 1 campo"); return; }
+      const h = LS("barriga_progress") || [];
+      h.unshift({
+        date: new Date().toLocaleDateString("pt-BR"),
+        ts: Date.now(),
+        peso: peso ? +peso : null,
+        cintura: cintura ? +cintura : null,
+        abdomen: abdomen ? +abdomen : null,
+        quadril: quadril ? +quadril : null,
+      });
+      LS("barriga_progress", h);
+      setProg(h);
+      setPf({ peso: "", cintura: "", abdomen: "", quadril: "" });
+      showT("Medidas salvas!");
+    }
+
+    function delProgEntry(idx) {
+      if (!confirm("Apagar esse registro?")) return;
+      const h = [...prog];
+      h.splice(idx, 1);
+      LS("barriga_progress", h);
+      setProg(h);
+    }
+
+    const barColor = defOk ? C.a : defOver ? C.red : consumed > 0 ? C.blue : C.m;
+    const tabS = (a) => ({
+      padding: "8px 11px", borderRadius: "7px 7px 0 0", fontSize: 11, fontWeight: 500,
+      cursor: "pointer", border: "none", background: a ? C.s2 : "transparent",
+      color: a ? C.a : C.m, whiteSpace: "nowrap",
+      borderBottom: a ? "2px solid " + C.a : "2px solid transparent",
+    });
+
+    return (
+      <div style={{ background: C.bg, minHeight: "100vh", color: C.t, maxWidth: 480, margin: "0 auto", paddingBottom: 40 }}>
+        {/* Header */}
+        <div style={{ padding: "14px 18px 10px", borderBottom: "1px solid " + C.b, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: C.bg, zIndex: 10 }}>
+          <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: 2, color: C.a }}>
+            PLANO<span style={{ color: C.a3 }}>.</span>BARRIGA
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {streak > 0 && (
+              <div style={{ ...chipS("#f5c51818", C.yellow), display: "flex", alignItems: "center", gap: 3, fontSize: 11 }}>
+                🔥 {streak}
+              </div>
+            )}
+            <div style={{ fontSize: 10, color: C.m, background: C.s2, border: "1px solid " + C.b, padding: "4px 10px", borderRadius: 20 }}>
+              {fmtD(new Date())}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: "flex", padding: "10px 12px 0", gap: 2, borderBottom: "1px solid " + C.b, overflowX: "auto" }}>
+          {[["diary", "Diário"], ["hist", "Histórico"], ["plan", "Plano"], ["prog", "Progresso"], ["config", "⚙️"]].map(([id, lb]) => (
+            <button key={id} onClick={() => setTab(id)} style={tabS(tab === id)}>{lb}</button>
+          ))}
+        </div>
+
+        <div style={{ padding: 16 }}>
+          {tab === "diary" && (
+            <DiaryTab {...{
+              cur, setCur, dow, plan, dKey,
+              exS, setExS, meals, upd, water, setWater, notes, setNotes,
+              ctype, setCtype, cmin, setCmin, analyzing, analyze, saved, saveDay,
+              consumed, burned, deficit, defOk, defOver, barColor, macros, settings,
+              setSaved, setRestTimer,
+            }} />
+          )}
+          {tab === "hist" && <HistoryTab hist={hist} />}
+          {tab === "plan" && <PlanTab />}
+          {tab === "prog" && <ProgressTab {...{ pf, setPf, saveProg, prog, delProgEntry }} />}
+          {tab === "config" && <ConfigTab settings={settings} setSettings={(s) => { setSettings(s); saveSettings(s); }} showT={showT} />}
+        </div>
+
+        {toast && (
+          <div style={{ position: "fixed", bottom: 18, left: "50%", transform: "translateX(-50%)", background: C.a, color: C.bg, padding: "9px 18px", borderRadius: 10, fontWeight: 600, fontSize: 12, zIndex: 999, whiteSpace: "nowrap", maxWidth: "85vw", textAlign: "center" }}>
+            {toast}
+          </div>
+        )}
+
+        {restTimer && <RestTimer onClose={() => setRestTimer(false)} />}
+      </div>
+    );
+  }
+
+  // ==================== Diary Tab ====================
+  function DiaryTab(p) {
+    const s = p.settings;
+    return (
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 12 }}>DIÁRIO DO DIA</div>
+
+        {/* Date navigator */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, background: C.c, border: "1px solid " + C.b, borderRadius: 12, padding: "10px 14px" }}>
+          <button onClick={() => { const d = new Date(p.cur); d.setDate(d.getDate() - 1); p.setCur(d); }} style={{ background: C.s2, border: "1px solid " + C.b, color: C.t, width: 32, height: 32, borderRadius: 8, fontSize: 16, cursor: "pointer" }}>‹</button>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: C.a }}>{fmtD(p.cur)}</div>
+            <div style={{ fontSize: 10, color: C.m }}>{WD[p.dow]}</div>
+          </div>
+          <button onClick={() => { const d = new Date(p.cur); d.setDate(d.getDate() + 1); p.setCur(d); }} style={{ background: C.s2, border: "1px solid " + C.b, color: C.t, width: 32, height: 32, borderRadius: 8, fontSize: 16, cursor: "pointer" }}>›</button>
+        </div>
+
+        {/* Balance */}
+        <div style={boxS}>
+          <div style={{ fontSize: 11, color: C.m, marginBottom: 10, letterSpacing: 1 }}>BALANÇO CALÓRICO</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+            {[[p.consumed, C.a3, "Consumido"], [p.burned, C.blue, "Queimado"], [p.consumed > 0 ? Math.abs(p.deficit) : "?", C.a, p.deficit < 0 ? "Superávit" : "Déficit"]].map(([v, c, l]) => (
+              <div key={l} style={{ background: C.s2, borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 20, fontWeight: 900, color: c, lineHeight: 1 }}>{v}</div>
+                <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginTop: 2, letterSpacing: 0.5 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: C.s2, borderRadius: 20, height: 8, overflow: "hidden", marginBottom: 7 }}>
+            <div style={{ width: p.consumed > 0 ? Math.min((p.consumed / s.TARGET) * 100, 100) + "%" : "0%", height: "100%", borderRadius: 20, background: p.barColor, transition: "width .5s" }} />
+          </div>
+          <div style={{ fontSize: 12, textAlign: "center", padding: "7px 10px", borderRadius: 9, background: p.defOk ? "#a8e06318" : p.defOver ? "#e74c3c18" : p.consumed > 0 ? "#3498db18" : C.s2, color: p.defOk ? C.a : p.defOver ? C.red : p.consumed > 0 ? C.blue : C.m }}>
+            {p.consumed === 0 ? "Analise refeições para calcular" : p.defOk ? "Déficit " + p.deficit + " kcal — no alvo!" : p.defOver ? (p.deficit < 0 ? "Superávit " + Math.abs(p.deficit) + " kcal" : "Déficit baixo " + p.deficit + " kcal") : "Déficit alto " + p.deficit + " kcal"}
+          </div>
+
+          {/* Macros agregados */}
+          {(p.macros.p > 0 || p.macros.c > 0 || p.macros.g > 0) && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 10 }}>
+              {[["P", "Proteína", p.macros.p, "#e74c3c"], ["C", "Carbo", p.macros.c, "#f5c518"], ["G", "Gordura", p.macros.g, "#3498db"]].map(([k, n, v, c]) => (
+                <div key={k} style={{ background: C.s2, borderRadius: 8, padding: "6px 4px", textAlign: "center" }}>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: c }}>{Math.round(v)}g</div>
+                  <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase" }}>{n}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Training */}
+        <div style={boxS}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.t }}>MUSCULAÇÃO — {p.plan.l}</div>
+            {p.plan.ex.length > 0 && (
+              <button onClick={() => p.setRestTimer(true)} style={{ background: C.s2, border: "1px solid " + C.b, color: C.a, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer" }}>⏱ Descanso</button>
+            )}
+          </div>
+          {p.plan.ex.length === 0 ? (
+            <div style={{ fontSize: 12, color: C.m, marginBottom: 8 }}>Sem musculação hoje</div>
+          ) : (
+            <div style={{ marginBottom: 10 }}>
+              {p.plan.ex.map((ex, i) => {
+                const done = !!p.exS[i];
+                return (
+                  <div key={i} onClick={() => { p.setExS((prev) => ({ ...prev, [i]: !prev[i] })); p.setSaved(false); }}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: done ? "#a8e06310" : C.s2, border: "1px solid " + (done ? "#a8e06335" : C.b), borderRadius: 8, marginBottom: 4, cursor: "pointer" }}>
+                    <div style={{ width: 17, height: 17, borderRadius: 4, border: "2px solid " + (done ? C.a : C.b), background: done ? C.a : C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.bg, fontSize: 11, fontWeight: 900, flexShrink: 0 }}>{done ? "✓" : ""}</div>
+                    <span style={{ fontSize: 12, flex: 1, textDecoration: done ? "line-through" : "none", color: done ? C.m : C.t }}>{ex.n}</span>
+                    <span style={{ fontSize: 9, color: C.a, background: "#a8e06315", padding: "2px 6px", borderRadius: 4 }}>{ex.s}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.t, marginBottom: 6 }}>CARDIO</div>
+          <div style={{ fontSize: 11, color: C.m, marginBottom: 8, padding: "6px 9px", background: C.s2, borderRadius: 7, borderLeft: "3px solid " + C.a2 }}>{p.plan.s}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Tipo</div>
+              <select value={p.ctype} onChange={(e) => { p.setCtype(e.target.value); p.setSaved(false); }} style={inpS}>
+                {["", "Corrida", "Ciclismo", "Caminhada", "HIIT"].map((o) => <option key={o} value={o}>{o || "Sem cardio"}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Duração (min)</div>
+              <input type="number" value={p.cmin} onChange={(e) => { p.setCmin(e.target.value); p.setSaved(false); }} placeholder="30" style={inpS} />
+            </div>
+          </div>
+        </div>
+
+        {/* Meals */}
+        <div style={boxS}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.t, marginBottom: 10 }}>REFEIÇÕES</div>
+          {p.meals.map((meal, i) => (
+            <div key={i} style={{ marginBottom: 10, border: "1px solid " + C.b, borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: C.s2 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{s.MEAL_NAMES[i]}</span>
+                <span style={{ fontSize: 10, color: C.m }}>{s.MEAL_TIMES[i]}</span>
+              </div>
+              <div style={{ padding: "10px 12px" }}>
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, padding: "3px 9px", borderRadius: 7, background: meal.kcal ? "#a8e06318" : "#ff6b3515", color: meal.kcal ? C.a : C.a3, border: "1px solid " + (meal.kcal ? "#a8e06335" : "#ff6b3530") }}>
+                    {meal.kcal ? meal.kcal + " kcal" : "? kcal"}
+                  </span>
+                </div>
+                <MealPhoto dKey={p.dKey} mealIdx={i} hasPhoto={meal.hasPhoto} onChange={(v) => p.upd(i, { hasPhoto: v })} />
+                <textarea value={meal.text} onChange={(e) => p.upd(i, { text: e.target.value })} placeholder="Descreva (opcional se tiver foto)..."
+                  style={{ width: "100%", background: C.s2, border: "1px solid " + C.b, borderRadius: 8, padding: "7px 10px", color: C.t, fontSize: 12, outline: "none", resize: "none", minHeight: 44, marginBottom: 7 }} />
+                {meal.analysis && !meal.analysis.error && (
+                  <div style={{ background: "#a8e06308", border: "1px solid #a8e06322", borderRadius: 8, padding: "9px 10px", fontSize: 11, lineHeight: 1.7, marginBottom: 7 }}>
+                    <strong style={{ color: C.a }}>Alimentos:</strong> {(meal.analysis.foods || []).join(", ")}<br />
+                    <strong style={{ color: C.a }}>{meal.analysis.kcal} kcal</strong> | P:{meal.analysis.protein_g}g C:{meal.analysis.carb_g}g G:{meal.analysis.fat_g}g<br />
+                    <strong style={{ color: C.a }}>Avaliação:</strong> {meal.analysis.assessment}<br />
+                    <strong style={{ color: C.a }}>Dica:</strong> {meal.analysis.tip}
+                  </div>
+                )}
+                {meal.analysis && meal.analysis.error && (
+                  <div style={{ background: "#e74c3c15", borderRadius: 8, padding: "7px 10px", fontSize: 11, color: C.red, marginBottom: 7 }}>Erro: {meal.analysis.error}</div>
+                )}
+                <button onClick={() => p.analyze(i)} disabled={p.analyzing === i || (!meal.hasPhoto && !meal.text)}
+                  style={{ width: "100%", padding: 9, background: C.s2, border: "1.5px solid " + (p.analyzing === i || (!meal.hasPhoto && !meal.text) ? C.b : C.a), borderRadius: 8, color: p.analyzing === i || (!meal.hasPhoto && !meal.text) ? C.m : C.a, fontSize: 11, cursor: "pointer", letterSpacing: 1, marginBottom: 6 }}>
+                  {p.analyzing === i ? "Analisando..." : "ANALISAR COM IA"}
+                </button>
+                <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: meal.done ? C.a2 : C.m, cursor: "pointer" }}>
+                  <input type="checkbox" checked={meal.done} onChange={(e) => p.upd(i, { done: e.target.checked })} style={{ accentColor: C.a }} />
+                  Concluída
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Water */}
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.t, marginBottom: 8 }}>ÁGUA</div>
+          <div style={{ fontSize: 10, color: C.m, marginBottom: 8 }}>Toque num copo para marcar até ali.</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+            {Array.from({ length: 12 }, (_, i) => (
+              <div key={i} onClick={() => { p.setWater(i < p.water ? i : i + 1); p.setSaved(false); }}
+                style={{ width: 32, height: 32, borderRadius: 7, border: "1.5px solid " + (i + 1 === p.water ? C.blue : i < p.water ? "#2a5280" : C.b), background: i < p.water ? "#1a3a5c" : C.s2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
+                💧
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: C.m }}>{p.water}/12 copos · {p.water * 250}ml</div>
+        </div>
+
+        {/* Notes */}
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.t, marginBottom: 7 }}>OBSERVAÇÕES</div>
+          <textarea value={p.notes} onChange={(e) => { p.setNotes(e.target.value); p.setSaved(false); }} placeholder="Como foi o treino, sono, disposição..."
+            style={{ width: "100%", background: C.s2, border: "1px solid " + C.b, borderRadius: 8, padding: "8px 10px", color: C.t, fontSize: 12, outline: "none", resize: "none", minHeight: 60 }} />
+        </div>
+
+        <button onClick={p.saveDay} style={{ ...btnPrimary(p.saved ? C.a2 : C.a), marginTop: 4 }}>
+          {p.saved ? "✓ DIA SALVO" : "SALVAR DIA"}
+        </button>
+      </div>
+    );
+  }
+
+  // ==================== History Tab ====================
+  function HistoryTab({ hist }) {
+    return (
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 12 }}>HISTÓRICO</div>
+        {hist.length === 0 && <div style={{ textAlign: "center", color: C.m, padding: 40, border: "1px dashed " + C.b, borderRadius: 12 }}>Nenhum dia salvo ainda.</div>}
+        {hist.map(({ key, d }) => {
+          const [y, mo, day] = key.split("-");
+          const ok = d.deficit >= 200 && d.deficit <= 700;
+          return (
+            <div key={key} style={{ ...boxS, marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: C.a }}>{day}/{mo}/{y}</div>
+                  <div style={{ fontSize: 10, color: C.m }}>{d.weekday} — {d.label}</div>
+                </div>
+                {d.consumed > 0 && <span style={chipS(ok ? "#a8e06318" : "#e74c3c15", ok ? C.a : C.red)}>{ok ? "✓ " : "! "}{d.deficit} kcal</span>}
+              </div>
+              {d.consumed > 0 && <div style={{ fontSize: 10, color: C.m }}>{d.consumed} consumido · {d.burned} queimado</div>}
+              {d.macros && (d.macros.p > 0 || d.macros.c > 0) && (
+                <div style={{ fontSize: 10, color: C.m, marginTop: 3 }}>
+                  P:{Math.round(d.macros.p)}g · C:{Math.round(d.macros.c)}g · G:{Math.round(d.macros.g)}g
+                </div>
+              )}
+              {d.notes && <div style={{ fontSize: 10, color: C.m, fontStyle: "italic", marginTop: 5, borderTop: "1px solid " + C.b, paddingTop: 5 }}>{d.notes}</div>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ==================== Plan Tab ====================
+  function PlanTab() {
+    const days = [
+      { n: "Segunda", t: "Peito+Tríceps", ex: ["Supino reto 4x10-12", "Crucifixo 4x10-12", "Tríceps corda 4x12", "Mergulho 3x falha", "Flexão 3x12"], c: "Corrida HIIT 25min" },
+      { n: "Terça", t: "Costas+Bíceps", ex: ["Barra fixa 4x max", "Remada curvada 4x10-12", "Pulldown 4x12", "Rosca direta 3x12", "Rosca martelo 3x12"], c: "Ciclismo 40min" },
+      { n: "Quarta", t: "Pernas+Glúteos", ex: ["Agachamento 4x12-15", "Leg press 4x12-15", "Stiff 4x12", "Cadeira extensora 3x15", "Elevação quadril 3x15"], c: "Corrida leve 35min" },
+      { n: "Quinta", t: "Ombro+Core", ex: ["Desenvolvimento 4x10-12", "Elevação lateral 4x12-15", "Face pull 3x15", "Prancha 3x45s", "Abdominal bicicleta 3x20", "Russian twist 3x20"], c: "Ciclismo HIIT 30min" },
+      { n: "Sexta", t: "Full Body", ex: ["Terra (deadlift) 4x8-10", "Agachamento frontal 3x10", "Remada unilateral 3x12", "Desenvolvimento halter 3x12", "Abdominal prancha 3x45s"], c: "Bike leve 30min" },
+      { n: "Sábado", t: "Cardio Longo", ex: [], c: "Ciclismo 75-90min" },
+      { n: "Domingo", t: "Descanso", ex: [], c: "Caminhada ou alongamento" },
+    ];
+    return (
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 12 }}>PLANO SEMANAL</div>
+        {days.map((p) => (
+          <div key={p.n} style={boxS}>
+            <div style={{ fontSize: 17, fontWeight: 900, color: C.t }}>{p.n}</div>
+            <div style={{ fontSize: 10, color: C.m, marginBottom: 7 }}>{p.t}</div>
+            {p.ex.map((e) => <div key={e} style={{ fontSize: 11, color: C.t, padding: "2px 0", borderBottom: "1px solid " + C.b }}>· {e}</div>)}
+            <div style={{ marginTop: 8, background: C.s2, borderRadius: 7, padding: "7px 9px", fontSize: 11, color: C.a }}>{p.c}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ==================== Progress Tab ====================
+  function ProgressTab({ pf, setPf, saveProg, prog, delProgEntry }) {
+    const canvasRef = useRef(null);
+    const chartRef = useRef(null);
+
+    useEffect(() => {
+      if (!canvasRef.current || prog.length < 2) {
+        if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+        return;
+      }
+      const ordered = [...prog].reverse();
+      const labels = ordered.map((p) => p.date);
+      const ds = [
+        { label: "Peso (kg)", field: "peso", color: "#a8e063" },
+        { label: "Cintura (cm)", field: "cintura", color: "#ff6b35" },
+        { label: "Abdômen (cm)", field: "abdomen", color: "#f5c518" },
+        { label: "Quadril (cm)", field: "quadril", color: "#3498db" },
+      ].map((d) => ({
+        label: d.label,
+        data: ordered.map((p) => p[d.field]),
+        borderColor: d.color,
+        backgroundColor: d.color + "22",
+        tension: 0.3,
+        spanGaps: true,
+        pointRadius: 3,
+        pointBackgroundColor: d.color,
+      }));
+
+      if (chartRef.current) chartRef.current.destroy();
+      chartRef.current = new Chart(canvasRef.current, {
+        type: "line",
+        data: { labels, datasets: ds },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: "#e8f0e0", font: { size: 10 }, boxWidth: 12 } },
+            tooltip: { backgroundColor: "#181f12", borderColor: "#2a3520", borderWidth: 1 },
+          },
+          scales: {
+            x: { ticks: { color: "#6b7d5e", font: { size: 9 } }, grid: { color: "#2a352055" } },
+            y: { ticks: { color: "#6b7d5e", font: { size: 9 } }, grid: { color: "#2a352055" } },
+          },
+        },
+      });
+      return () => { if (chartRef.current) chartRef.current.destroy(); };
+    }, [prog]);
+
+    return (
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 12 }}>PROGRESSO</div>
+
+        <div style={boxS}>
+          <div style={{ fontSize: 14, fontWeight: 900, color: C.a, marginBottom: 10 }}>REGISTRAR MEDIDAS</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+            {[["peso", "Peso (kg)"], ["cintura", "Cintura (cm)"], ["abdomen", "Abdômen (cm)"], ["quadril", "Quadril (cm)"]].map(([f, l]) => (
+              <div key={f}>
+                <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>{l}</div>
+                <input type="number" step="0.1" value={pf[f]} onChange={(e) => setPf((p) => ({ ...p, [f]: e.target.value }))} style={inpS} />
+              </div>
+            ))}
+          </div>
+          <button onClick={saveProg} style={btnPrimary(C.a)}>SALVAR MEDIDAS</button>
+        </div>
+
+        {prog.length >= 2 && (
+          <div style={boxS}>
+            <div style={{ fontSize: 14, fontWeight: 900, color: C.a, marginBottom: 10 }}>EVOLUÇÃO</div>
+            <div style={{ height: 250 }}>
+              <canvas ref={canvasRef} />
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: 17, fontWeight: 900, color: C.t, marginBottom: 10 }}>HISTÓRICO</div>
+        {prog.length === 0 && <div style={{ textAlign: "center", color: C.m, padding: 30, border: "1px dashed " + C.b, borderRadius: 11 }}>Nenhum registro ainda.</div>}
+        {prog.map((item, i) => {
+          const prev = prog[i + 1];
+          return (
+            <div key={i} style={{ ...boxS, marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <div style={{ fontSize: 10, color: C.m }}>📅 {item.date}</div>
+                <button onClick={() => delProgEntry(i)} style={{ background: "none", border: "none", color: C.m, fontSize: 11, cursor: "pointer" }}>×</button>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {[["peso", "kg"], ["cintura", "cm"], ["abdomen", "cm"], ["quadril", "cm"]].map(([f, u]) => {
+                  if (item[f] == null) return null;
+                  const dv = prev && prev[f] != null ? item[f] - prev[f] : null;
+                  return (
+                    <div key={f} style={{ fontSize: 12 }}>
+                      {f}: <strong style={{ color: C.a }}>{item[f]}{u}</strong>
+                      {dv != null && <span style={{ fontSize: 9, padding: "1px 4px", borderRadius: 4, marginLeft: 2, background: dv < 0 ? "#a8e06318" : "#e74c3c15", color: dv < 0 ? C.a : C.red }}>{dv > 0 ? "+" : ""}{dv.toFixed(1)}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ==================== Config Tab ====================
+  function ConfigTab({ settings, setSettings, showT }) {
+    const [s, setS] = useState(settings);
+    const fileRef = useRef(null);
+
+    function update(k, v) { setS((p) => ({ ...p, [k]: v })); }
+    function updateMeal(i, field, v) {
+      setS((p) => {
+        const next = { ...p };
+        next[field] = [...p[field]];
+        next[field][i] = v;
+        return next;
+      });
+    }
+
+    function save() {
+      const clean = {
+        ...s,
+        TDEE: Number(s.TDEE) || DEFAULTS.TDEE,
+        TARGET: Number(s.TARGET) || DEFAULTS.TARGET,
+        WEIGHT: Number(s.WEIGHT) || DEFAULTS.WEIGHT,
+        PROXY_URL: (s.PROXY_URL || "").trim(),
+      };
+      setSettings(clean);
+      showT("Configurações salvas");
+    }
+
+    async function handleExport() {
+      try { await exportAll(); showT("Backup baixado"); }
+      catch (e) { showT("Erro: " + e.message); }
+    }
+
+    async function handleImport(file) {
+      if (!file) return;
+      if (!confirm("Importar vai sobrescrever dados atuais. Continuar?")) return;
+      try {
+        await importAll(file);
+        showT("Importado! Recarregue.");
+        setTimeout(() => location.reload(), 1200);
+      } catch (e) { showT("Erro: " + e.message); }
+    }
+
+    function reset() {
+      if (!confirm("Resetar TODAS as configurações ao padrão? (dados não serão apagados)")) return;
+      setS(DEFAULTS);
+      setSettings(DEFAULTS);
+      showT("Configurações resetadas");
+    }
+
+    return (
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: C.t, marginBottom: 12 }}>CONFIGURAÇÕES</div>
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>MÉTRICAS</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>TDEE (kcal/dia)</div>
+              <input type="number" value={s.TDEE} onChange={(e) => update("TDEE", e.target.value)} style={inpS} />
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Meta (teto kcal)</div>
+              <input type="number" value={s.TARGET} onChange={(e) => update("TARGET", e.target.value)} style={inpS} />
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Peso atual (kg)</div>
+              <input type="number" step="0.1" value={s.WEIGHT} onChange={(e) => update("WEIGHT", e.target.value)} style={inpS} />
+            </div>
+          </div>
+          <div style={{ fontSize: 10, color: C.m, lineHeight: 1.5 }}>
+            Déficit esperado: <strong style={{ color: C.a }}>{(Number(s.TDEE) || 0) - (Number(s.TARGET) || 0)} kcal/dia</strong>
+            {" · "}~{(((Number(s.TDEE) || 0) - (Number(s.TARGET) || 0)) * 7 / 7700).toFixed(2)} kg/semana
+          </div>
+        </div>
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>REFEIÇÕES</div>
+          <div style={{ fontSize: 10, color: C.m, marginBottom: 8 }}>Ajuste nomes e horários conforme sua rotina.</div>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 6, marginBottom: 6 }}>
+              <input value={s.MEAL_NAMES[i]} onChange={(e) => updateMeal(i, "MEAL_NAMES", e.target.value)} style={inpS} />
+              <input value={s.MEAL_TIMES[i]} onChange={(e) => updateMeal(i, "MEAL_TIMES", e.target.value)} style={inpS} placeholder="ex: 07h-08h" />
+            </div>
+          ))}
+        </div>
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>PROXY DA IA</div>
+          <div style={{ fontSize: 10, color: C.m, marginBottom: 6 }}>
+            URL do Cloudflare Worker. Deixa em branco pra desabilitar análise de IA.
+          </div>
+          <input value={s.PROXY_URL} onChange={(e) => update("PROXY_URL", e.target.value)} placeholder="https://plano-barriga-proxy.seudominio.workers.dev" style={inpS} />
+          <div style={{ fontSize: 9, color: C.m, marginTop: 6 }}>Veja <strong>REVIEW.md</strong> para como publicar o proxy.</div>
+        </div>
+
+        <button onClick={save} style={btnPrimary(C.a)}>SALVAR CONFIGURAÇÕES</button>
+
+        <div style={{ height: 18 }} />
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>BACKUP</div>
+          <div style={{ fontSize: 10, color: C.m, marginBottom: 10 }}>
+            Exporta tudo (dados, fotos, medidas) num arquivo JSON pra você salvar.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <button onClick={handleExport} style={{ ...btnPrimary(C.blue), padding: 10, fontSize: 12 }}>↓ EXPORTAR</button>
+            <button onClick={() => fileRef.current.click()} style={{ ...btnPrimary(C.yellow), padding: 10, fontSize: 12 }}>↑ IMPORTAR</button>
+            <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => handleImport(e.target.files[0])} />
+          </div>
+        </div>
+
+        <button onClick={reset} style={{ ...btnPrimary(C.red), marginTop: 8, padding: 10, fontSize: 12 }}>RESETAR CONFIGURAÇÕES</button>
+
+        <div style={{ marginTop: 20, textAlign: "center", fontSize: 10, color: C.m }}>
+          PLANO.BARRIGA v2 · Dados 100% locais
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== Mount ====================
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+
+  <script>
+    // Service Worker registration
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW registration failed:", e));
+      });
+    }
+  </script>
+</body>
+</html>
