@@ -2,7 +2,7 @@
 // Cache do app shell pra funcionar offline.
 // Estratégia: stale-while-revalidate pros assets estáticos, network-first pra análise de IA.
 
-const VERSION = "v2.2.3";
+const VERSION = "v2.2.4";
 const CACHE = "diariofit-" + VERSION;
 
 const SHELL = [
