@@ -422,6 +422,32 @@
       if (tab === "prog") setProg(LS("barriga_progress") || []);
     }, [tab]);
 
+    // Auto-save: salva tudo automaticamente em qualquer mudança
+    const prevDKeyRef = useRef("");
+    useEffect(() => {
+      // Pula o primeiro autosave após mudança de data (load ainda processando)
+      if (prevDKeyRef.current !== dKey) {
+        prevDKeyRef.current = dKey;
+        return;
+      }
+      const hasContent = consumed > 0
+        || meals.some((m) => (m.kcal || 0) > 0 || m.text || m.hasPhoto)
+        || Object.values(exS).some((v) => v === true || (Number(v) || 0) > 0)
+        || (extraEx || []).length > 0
+        || (cardios || []).some((c) => c.type && (parseFloat(c.min) || 0) > 0)
+        || (notes || "").length > 0
+        || (water || 0) > 0;
+      LS("diary_" + dKey, {
+        saved: hasContent,
+        exS, extraEx, meals, water, notes, cardios,
+        ct: (cardios[0] && cardios[0].type) || "",
+        cm: (cardios[0] && cardios[0].min) || "",
+        weekday: WD[dow], label: plan.l,
+        consumed, burned, deficit, macros,
+      });
+      if (hasContent !== saved) setSaved(hasContent);
+    }, [exS, extraEx, meals, water, notes, cardios, dKey]);
+
     // Recompute streak
     useEffect(() => { setStreak(computeStreak()); }, [saved, tab]);
 
