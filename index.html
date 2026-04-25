@@ -48,8 +48,8 @@
     EK: 8,
     WEIGHT: 85,
     PROXY_URL: "https://diariofit-proxy.romarioproxxima.workers.dev",
-    MEAL_NAMES: ["Café da manhã", "Pré/Pós Treino", "Almoço", "Jantar"],
-    MEAL_TIMES: ["07h-08h", "11h-12h30", "14h-15h", "19h-20h"],
+    MEAL_NAMES: ["Café da manhã", "Lanche da manhã", "Almoço", "Lanche da tarde", "Jantar"],
+    MEAL_TIMES: ["07h-08h", "10h", "11h-12h30", "16h", "19h-20h"],
   };
 
   const CK = { Corrida: 11, Ciclismo: 8, Caminhada: 5, HIIT: 14, "": 0 };
@@ -123,12 +123,17 @@
   }
 
   function emptyM() {
-    return [0, 1, 2, 3].map(() => ({ hasPhoto: false, text: "", kcal: 0, analysis: null, done: false }));
+    return [0, 1, 2, 3, 4].map(() => ({ hasPhoto: false, text: "", kcal: 0, analysis: null, done: false }));
   }
 
   function loadSettings() {
     const merged = { ...DEFAULTS, ...(LS("barriga_settings") || {}) };
     if (!merged.PROXY_URL || !merged.PROXY_URL.trim()) merged.PROXY_URL = DEFAULTS.PROXY_URL;
+    // Migração: se localStorage tem só 4 refeições, expande para 5 (Lanche da manhã + Lanche da tarde)
+    if (Array.isArray(merged.MEAL_NAMES) && merged.MEAL_NAMES.length < 5) {
+      merged.MEAL_NAMES = [...DEFAULTS.MEAL_NAMES];
+      merged.MEAL_TIMES = [...DEFAULTS.MEAL_TIMES];
+    }
     return merged;
   }
   function saveSettings(s) { LS("barriga_settings", s); }
@@ -338,8 +343,7 @@
     const [meals, setMeals] = useState(emptyM());
     const [water, setWater] = useState(0);
     const [notes, setNotes] = useState("");
-    const [ctype, setCtype] = useState("");
-    const [cmin, setCmin] = useState("");
+    const [cardios, setCardios] = useState([{ type: "", min: "" }]);
     const [analyzing, setAnalyzing] = useState(null);
     const [toast, setToast] = useState("");
     const [saved, setSaved] = useState(false);
@@ -357,7 +361,7 @@
     const setsDone = (v, k) => (v === true ? k : Math.max(0, Math.min(Number(v) || 0, k)));
     const burned = plan.ex.reduce((s, ex, i) => s + setsDone(exS[i], ex.k) * EK, 0)
       + (extraEx || []).reduce((s, ex) => s + setsDone(ex.done, ex.k || 4) * EK, 0)
-      + Math.round((CK[ctype] || 0) * (parseFloat(cmin) || 0));
+      + (cardios || []).reduce((s, c) => s + Math.round((CK[c.type] || 0) * (parseFloat(c.min) || 0)), 0);
     const deficit = (settings.TDEE + burned) - consumed;
     const defOk = consumed > 0 && deficit >= 200 && deficit <= 700;
     const defOver = consumed > 0 && deficit < 200;
@@ -384,11 +388,23 @@
       const s = LS("diary_" + dKey) || {};
       setExS(s.exS || {});
       setExtraEx(Array.isArray(s.extraEx) ? s.extraEx : []);
-      setMeals(s.meals || emptyM());
+      // Migra meals antigos: 4 refeições -> 5 (insere "Lanche da tarde" antes do Jantar)
+      const sm = Array.isArray(s.meals) ? s.meals : null;
+      if (sm && sm.length === 4) {
+        const empty = { hasPhoto: false, text: "", kcal: 0, analysis: null, done: false };
+        setMeals([sm[0], sm[1], sm[2], { ...empty }, sm[3]]);
+      } else {
+        setMeals(sm || emptyM());
+      }
       setWater(s.water || 0);
       setNotes(s.notes || "");
-      setCtype(s.ct || "");
-      setCmin(s.cm || "");
+      if (Array.isArray(s.cardios) && s.cardios.length > 0) {
+        setCardios(s.cardios);
+      } else if (s.ct || s.cm) {
+        setCardios([{ type: s.ct || "", min: s.cm || "" }]);
+      } else {
+        setCardios([{ type: "", min: "" }]);
+      }
       setSaved(!!s.saved);
     }, [dKey]);
 
@@ -464,7 +480,7 @@
     // ==================== Save day ====================
     function saveDay() {
       LS("diary_" + dKey, {
-        saved: true, exS, extraEx, meals, water, notes, ct: ctype, cm: cmin,
+        saved: true, exS, extraEx, meals, water, notes, cardios, ct: (cardios[0] && cardios[0].type) || "", cm: (cardios[0] && cardios[0].min) || "",
         weekday: WD[dow], label: plan.l,
         consumed, burned, deficit, macros,
       });
@@ -538,7 +554,7 @@
             <DiaryTab {...{
               cur, setCur, dow, plan, dKey,
               exS, setExS, extraEx, setExtraEx, meals, upd, water, setWater, notes, setNotes,
-              ctype, setCtype, cmin, setCmin, analyzing, analyze, saved, saveDay,
+              cardios, setCardios, analyzing, analyze, saved, saveDay,
               consumed, burned, deficit, defOk, defOver, barColor, macros, settings,
               setSaved, setRestTimer,
             }} />
@@ -659,18 +675,44 @@
           <AddExerciseForm onAdd={(ex) => { p.setExtraEx((prev) => [...prev, ex]); p.setSaved(false); }} />
           <div style={{ fontSize: 13, fontWeight: 700, color: C.t, marginBottom: 6 }}>CARDIO</div>
           <div style={{ fontSize: 11, color: C.m, marginBottom: 8, padding: "6px 9px", background: C.s2, borderRadius: 7, borderLeft: "3px solid " + C.a2 }}>{p.plan.s}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Tipo</div>
-              <select value={p.ctype} onChange={(e) => { p.setCtype(e.target.value); p.setSaved(false); }} style={inpS}>
-                {["", "Corrida", "Ciclismo", "Caminhada", "HIIT"].map((o) => <option key={o} value={o}>{o || "Sem cardio"}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Duração (min)</div>
-              <input type="number" value={p.cmin} onChange={(e) => { p.setCmin(e.target.value); p.setSaved(false); }} placeholder="30" style={inpS} />
-            </div>
-          </div>
+          {(p.cardios || []).map((c, i) => {
+            const kcalC = Math.round((CK[c.type] || 0) * (parseFloat(c.min) || 0));
+            return (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 22px", gap: 6, marginBottom: 6, alignItems: "end" }}>
+                <div>
+                  {i === 0 && <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Tipo</div>}
+                  <select value={c.type} onChange={(e) => {
+                    const v = e.target.value;
+                    p.setCardios((prev) => prev.map((x, j) => j === i ? { ...x, type: v } : x));
+                    p.setSaved(false);
+                  }} style={inpS}>
+                    {["", "Corrida", "Ciclismo", "Caminhada", "HIIT"].map((o) => <option key={o} value={o}>{o || "Sem cardio"}</option>)}
+                  </select>
+                </div>
+                <div>
+                  {i === 0 && <div style={{ fontSize: 9, color: C.m, textTransform: "uppercase", marginBottom: 3 }}>Duração (min)</div>}
+                  <input type="number" value={c.min} onChange={(e) => {
+                    const v = e.target.value;
+                    p.setCardios((prev) => prev.map((x, j) => j === i ? { ...x, min: v } : x));
+                    p.setSaved(false);
+                  }} placeholder="30" style={inpS} />
+                </div>
+                <button type="button" onClick={() => {
+                  p.setCardios((prev) => prev.length > 1 ? prev.filter((_, j) => j !== i) : [{ type: "", min: "" }]);
+                  p.setSaved(false);
+                }} title="Remover" style={{ background: "none", border: "none", color: C.m, fontSize: 16, cursor: "pointer", padding: 0, height: 30 }}>×</button>
+                {kcalC > 0 && (
+                  <div style={{ gridColumn: "1 / -1", fontSize: 10, color: C.blue, marginTop: -2 }}>
+                    +{kcalC} kcal
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <button type="button" onClick={() => { p.setCardios((prev) => [...prev, { type: "", min: "" }]); p.setSaved(false); }}
+            style={{ width: "100%", background: C.s2, border: "1px dashed " + C.b, color: C.a, padding: "6px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
+            + Adicionar cardio
+          </button>
         </div>
 
         {/* Meals */}
@@ -1056,7 +1098,7 @@
         <div style={boxS}>
           <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>REFEIÇÕES</div>
           <div style={{ fontSize: 10, color: C.m, marginBottom: 8 }}>Ajuste nomes e horários conforme sua rotina.</div>
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 6, marginBottom: 6 }}>
               <input value={s.MEAL_NAMES[i]} onChange={(e) => updateMeal(i, "MEAL_NAMES", e.target.value)} style={inpS} />
               <input value={s.MEAL_TIMES[i]} onChange={(e) => updateMeal(i, "MEAL_TIMES", e.target.value)} style={inpS} placeholder="ex: 07h-08h" />
