@@ -48,6 +48,8 @@
     EK: 8,
     WEIGHT: 85,
     PROXY_URL: "https://diariofit-proxy.romarioproxxima.workers.dev",
+    SYNC_URL: "",
+    DEVICE_NAME: "",
     MEAL_NAMES: ["Café da manhã", "Lanche da manhã", "Almoço", "Lanche da tarde", "Jantar"],
     MEAL_TIMES: ["07h-08h", "10h", "11h-12h30", "16h", "19h-20h"],
   };
@@ -137,6 +139,123 @@
     return merged;
   }
   function saveSettings(s) { LS("barriga_settings", s); }
+
+  function getDeviceId() {
+    let id = LS("barriga_device_id");
+    if (!id) {
+      id = "d_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
+      LS("barriga_device_id", id);
+    }
+    return id;
+  }
+
+  async function syncDay(dKey, settings) {
+    if (!settings.SYNC_URL || !settings.SYNC_URL.trim()) return { ok: false, reason: "no_url" };
+    const data = LS("diary_" + dKey);
+    if (!data) return { ok: false, reason: "no_data" };
+    const dow = new Date(dKey + "T12:00:00").getDay();
+    const planEx = (PLAN[dow] || { ex: [] }).ex || [];
+    const exS = data.exS || {};
+    const exercises = [
+      ...planEx.map((ex, i) => {
+        const v = exS[i];
+        const done = v === true ? ex.k : Math.max(0, Math.min(Number(v) || 0, ex.k));
+        return { name: ex.n, vol: ex.s, sets_total: ex.k, sets_done: done, extra: false };
+      }),
+      ...((data.extraEx || []).map((ex) => {
+        const v = ex.done;
+        const k = ex.k || 4;
+        const done = v === true ? k : Math.max(0, Math.min(Number(v) || 0, k));
+        return { name: ex.n, vol: ex.s, sets_total: k, sets_done: done, extra: true };
+      })),
+    ];
+    const meals = (data.meals || []).map((m, i) => {
+      const a = m.analysis || {};
+      return {
+        idx: i,
+        name: (settings.MEAL_NAMES[i] || ""),
+        time: (settings.MEAL_TIMES[i] || ""),
+        kcal: m.kcal || 0,
+        foods: a.foods ? a.foods.join(", ") : "",
+        p: Number(a.protein_g) || 0,
+        c: Number(a.carb_g) || 0,
+        g: Number(a.fat_g) || 0,
+        text: m.text || "",
+        assessment: a.assessment || "",
+        tip: a.tip || "",
+      };
+    });
+    const cardios = (data.cardios || []).map((c) => ({
+      type: c.type || "",
+      min: parseFloat(c.min) || 0,
+      kcal: Math.round((CK[c.type] || 0) * (parseFloat(c.min) || 0)),
+    }));
+    const payload = {
+      device_id: getDeviceId(),
+      device_name: settings.DEVICE_NAME || "",
+      date: dKey,
+      weekday: data.weekday || "",
+      label: data.label || "",
+      consumed: data.consumed || 0,
+      burned: data.burned || 0,
+      deficit: data.deficit || 0,
+      tdee: Number(settings.TDEE) || 0,
+      target: Number(settings.TARGET) || 0,
+      macros_p: (data.macros && data.macros.p) || 0,
+      macros_c: (data.macros && data.macros.c) || 0,
+      macros_g: (data.macros && data.macros.g) || 0,
+      water: data.water || 0,
+      notes: data.notes || "",
+      saved: !!data.saved,
+      meals, exercises, cardios,
+      synced_at: new Date().toISOString(),
+    };
+    try {
+      // text/plain pra evitar preflight CORS no Apps Script
+      await fetch(settings.SYNC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+      const synced = LS("barriga_synced") || {};
+      synced[dKey] = Date.now();
+      LS("barriga_synced", synced);
+      const pending = LS("barriga_sync_pending") || {};
+      delete pending[dKey];
+      LS("barriga_sync_pending", pending);
+      return { ok: true };
+    } catch (e) {
+      const pending = LS("barriga_sync_pending") || {};
+      pending[dKey] = Date.now();
+      LS("barriga_sync_pending", pending);
+      return { ok: false, reason: "fetch_failed", error: String(e) };
+    }
+  }
+
+  async function syncAllPending(settings) {
+    const pending = LS("barriga_sync_pending") || {};
+    const dates = Object.keys(pending);
+    let ok = 0, fail = 0;
+    for (const d of dates) {
+      const r = await syncDay(d, settings);
+      if (r.ok) ok++; else fail++;
+    }
+    return { ok, fail, total: dates.length };
+  }
+
+  async function syncAllHistory(settings) {
+    const dates = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("diary_")) dates.push(k.replace("diary_", ""));
+    }
+    let ok = 0, fail = 0;
+    for (const d of dates) {
+      const r = await syncDay(d, settings);
+      if (r.ok) ok++; else fail++;
+    }
+    return { ok, fail, total: dates.length };
+  }
 
   // IndexedDB for photos (saves localStorage quota)
   const PHOTO_DB = "planobarriga_photos";
@@ -446,10 +565,21 @@
         consumed, burned, deficit, macros,
       });
       if (hasContent !== saved) setSaved(hasContent);
+      // Sync para nuvem (não bloqueia UI)
+      if (settings.SYNC_URL && hasContent) {
+        syncDay(dKey, settings);
+      }
     }, [exS, extraEx, meals, water, notes, cardios, dKey]);
 
     // Recompute streak
     useEffect(() => { setStreak(computeStreak()); }, [saved, tab]);
+
+    // Replay de syncs pendentes
+    useEffect(() => {
+      if (settings.SYNC_URL) {
+        syncAllPending(settings).catch(() => {});
+      }
+    }, [settings.SYNC_URL]);
 
     // ==================== Analyze ====================
     async function analyze(i) {
@@ -1139,6 +1269,40 @@
           </div>
           <input value={s.PROXY_URL} onChange={(e) => update("PROXY_URL", e.target.value)} placeholder="https://plano-barriga-proxy.seudominio.workers.dev" style={inpS} />
           <div style={{ fontSize: 9, color: C.m, marginTop: 6 }}>Veja <strong>REVIEW.md</strong> para como publicar o proxy.</div>
+        </div>
+
+        <div style={boxS}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: C.a, marginBottom: 8 }}>SYNC NA NUVEM (Google Sheets)</div>
+          <div style={{ fontSize: 10, color: C.m, marginBottom: 6 }}>
+            URL do Apps Script (Web App). Sempre que salvar um dia, replica na sua planilha.
+          </div>
+          <input value={s.SYNC_URL || ""} onChange={(e) => update("SYNC_URL", e.target.value)} placeholder="https://script.google.com/macros/s/.../exec" style={inpS} />
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 10, color: C.m, marginBottom: 4 }}>NOME DESTE DEVICE (ex: "Romário", "Esposa")</div>
+            <input value={s.DEVICE_NAME || ""} onChange={(e) => update("DEVICE_NAME", e.target.value)} placeholder="Romário" style={inpS} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
+            <button type="button" onClick={async () => {
+              if (!s.SYNC_URL) { showT("Configure a URL primeiro"); return; }
+              showT("Sincronizando...");
+              const r = await syncAllPending(s);
+              showT("Pendentes: " + r.ok + "/" + r.total);
+            }} style={{ background: C.s2, border: "1px solid " + C.b, color: C.a, padding: "8px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+              ↻ Sincronizar pendentes
+            </button>
+            <button type="button" onClick={async () => {
+              if (!s.SYNC_URL) { showT("Configure a URL primeiro"); return; }
+              if (!confirm("Re-enviar TODOS os dias do histórico para a planilha?")) return;
+              showT("Sincronizando histórico...");
+              const r = await syncAllHistory(s);
+              showT("Histórico: " + r.ok + "/" + r.total + " OK");
+            }} style={{ background: C.s2, border: "1px solid " + C.b, color: C.t, padding: "8px 10px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+              ☁ Subir histórico todo
+            </button>
+          </div>
+          <div style={{ fontSize: 9, color: C.m, marginTop: 6 }}>
+            Veja o arquivo <strong>SYNC_SETUP.md</strong> no GitHub do projeto pro passo a passo de criar a planilha.
+          </div>
         </div>
 
         <button onClick={save} style={btnPrimary(C.a)}>SALVAR CONFIGURAÇÕES</button>
