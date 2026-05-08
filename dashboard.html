@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DIÁRIO.FIT — Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg: #0c0f0a;
+      --c1: #181f12;
+      --c2: #1c2416;
+      --b: #2a3520;
+      --t: #e8f0e0;
+      --m: #6b7d5e;
+      --a: #a8e063;
+      --a2: #5cb85c;
+      --a3: #ff6b35;
+      --red: #e74c3c;
+      --blue: #3498db;
+      --yellow: #f5c518;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--t); min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 16px; max-width: 1200px; margin: 0 auto;
+    }
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px; padding: 14px 18px; background: var(--c1);
+      border: 1px solid var(--b); border-radius: 12px;
+    }
+    .logo { font-size: 22px; font-weight: 900; letter-spacing: 2px; color: var(--a); }
+    .logo .dot { color: var(--a3); }
+    .last-update { font-size: 11px; color: var(--m); }
+    .controls {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 18px; padding: 12px; background: var(--c1);
+      border: 1px solid var(--b); border-radius: 12px;
+    }
+    .controls label { font-size: 11px; color: var(--m); display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+    select, button {
+      background: var(--c2); color: var(--t); border: 1px solid var(--b);
+      padding: 8px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; outline: none;
+    }
+    button.refresh { background: var(--a); color: var(--bg); font-weight: 700; border: none; padding: 8px 16px; }
+    button.refresh:hover { background: var(--a2); }
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px; margin-bottom: 18px;
+    }
+    .kpi {
+      background: var(--c1); border: 1px solid var(--b); border-radius: 12px;
+      padding: 14px; text-align: center;
+    }
+    .kpi .v { font-size: 26px; font-weight: 900; line-height: 1; margin-bottom: 6px; }
+    .kpi .l { font-size: 10px; color: var(--m); text-transform: uppercase; letter-spacing: 1px; }
+    .kpi .sub { font-size: 11px; color: var(--m); margin-top: 4px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .card {
+      background: var(--c1); border: 1px solid var(--b); border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 14px; color: var(--a); margin-bottom: 12px;
+      letter-spacing: 1px; text-transform: uppercase; font-weight: 900;
+    }
+    .chart-wrap { position: relative; height: 280px; }
+    .chart-wrap-tall { position: relative; height: 320px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--b); }
+    th { color: var(--m); font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+    td.green { color: var(--a); }
+    td.red { color: var(--red); }
+    td.blue { color: var(--blue); }
+    .bar-mini {
+      display: inline-block; height: 10px; background: var(--c2); border-radius: 3px;
+      vertical-align: middle; min-width: 40px; max-width: 100px; position: relative; overflow: hidden;
+    }
+    .bar-mini > span { display: block; height: 100%; background: var(--a); }
+    .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 9px; font-weight: 700; }
+    .pill.ok { background: rgba(168, 224, 99, 0.15); color: var(--a); }
+    .pill.warn { background: rgba(245, 197, 24, 0.15); color: var(--yellow); }
+    .pill.bad { background: rgba(231, 76, 60, 0.15); color: var(--red); }
+    .pill.info { background: rgba(52, 152, 219, 0.15); color: var(--blue); }
+    .loading { text-align: center; padding: 40px; color: var(--m); }
+    .err { background: rgba(231, 76, 60, 0.1); border: 1px solid var(--red); color: var(--red); padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 12px; }
+    .hint { font-size: 10px; color: var(--m); margin-top: 8px; }
+    .meal-card {
+      border: 1px solid var(--b); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+      background: var(--c2);
+    }
+    .meal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .meal-name { font-size: 12px; font-weight: 700; }
+    .meal-kcal { font-size: 11px; color: var(--a); font-weight: 700; }
+    .meal-tip { font-size: 10px; color: var(--m); margin-top: 4px; line-height: 1.5; }
+    .day-tab {
+      display: inline-block; padding: 5px 9px; margin: 2px; border-radius: 6px;
+      background: var(--c2); border: 1px solid var(--b); color: var(--t);
+      font-size: 11px; cursor: pointer;
+    }
+    .day-tab.active { background: var(--a); color: var(--bg); border-color: var(--a); font-weight: 700; }
+    .day-tab.empty { opacity: 0.4; }
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .header { flex-direction: column; gap: 8px; }
+      .kpi .v { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="logo">DIÁRIO<span class="dot">.</span>FIT — Dashboard</div>
+      <div class="last-update" id="last-update">Carregando...</div>
+    </div>
+    <button class="refresh" id="btn-refresh">↻ Atualizar</button>
+  </div>
+
+  <div id="error-box"></div>
+
+  <div class="controls">
+    <label>
+      Pessoa
+      <select id="filter-device">
+        <option value="">Todas</option>
+      </select>
+    </label>
+    <label>
+      Período
+      <select id="filter-period">
+        <option value="7">Últimos 7 dias</option>
+        <option value="14" selected>Últimos 14 dias</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="all">Tudo</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="content" class="loading">Carregando dados da planilha...</div>
+
+  <script>
+    // ============== Config ==============
+    const SHEET_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8B7ete3JubUTXNvQ_qfMySURPBBi9uPmBtYrguWJEbM61b3XAzB7SAuphq_jPTdUCQXCl0W3yy1GD";
+    const GIDS = {
+      Dias: 1169272171,
+      Refeicoes: 285727567,
+      Exercicios: 1103996178,
+      Cardios: 889808136,
+    };
+
+    const C = {
+      bg: "#0c0f0a", c1: "#181f12", c2: "#1c2416", b: "#2a3520",
+      t: "#e8f0e0", m: "#6b7d5e", a: "#a8e063", a2: "#5cb85c", a3: "#ff6b35",
+      red: "#e74c3c", blue: "#3498db", yellow: "#f5c518",
+    };
+
+    let DATA = { Dias: [], Refeicoes: [], Exercicios: [], Cardios: [] };
+    let CHARTS = {};
+
+    // ============== Fetch ==============
+    function loadCSV(name, gid) {
+      const url = `${SHEET_BASE}/pub?gid=${gid}&single=true&output=csv&_=${Date.now()}`;
+      return fetch(url).then(r => r.text()).then(text => {
+        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+        return parsed.data.map(row => {
+          // Normalizar números
+          for (const k of Object.keys(row)) {
+            const v = row[k];
+            if (typeof v === "string" && /^-?\d+([.,]\d+)?$/.test(v.trim())) {
+              row[k] = parseFloat(v.replace(",", "."));
+            }
+          }
+          return row;
+        });
+      });
+    }
+
+    async function loadAll() {
+      const errBox = document.getElementById("error-box");
+      errBox.innerHTML = "";
+      document.getElementById("content").innerHTML = '<div class="loading">Carregando dados...</div>';
+      try {
+        const [d, r, e, c] = await Promise.all([
+          loadCSV("Dias", GIDS.Dias),
+          loadCSV("Refeicoes", GIDS.Refeicoes),
+          loadCSV("Exercicios", GIDS.Exercicios),
+          loadCSV("Cardios", GIDS.Cardios),
+        ]);
+        DATA.Dias = d.filter(x => x.date && !String(x.device_id || "").startsWith("test"));
+        DATA.Refeicoes = r.filter(x => x.date && !String(x.device_id || "").startsWith("test"));
+        DATA.Exercicios = e.filter(x => x.date && !String(x.device_id || "").startsWith("test"));
+        DATA.Cardios = c.filter(x => x.date && !String(x.device_id || "").startsWith("test"));
+
+        document.getElementById("last-update").textContent = "Atualizado: " + new Date().toLocaleString("pt-BR");
+        updateDeviceFilter();
+        render();
+      } catch (err) {
+        errBox.innerHTML = '<div class="err">Erro ao carregar planilha: ' + err.message + '</div>';
+        console.error(err);
+      }
+    }
+
+    function updateDeviceFilter() {
+      const sel = document.getElementById("filter-device");
+      const cur = sel.value;
+      const devices = [...new Set(DATA.Dias.map(d => d.device_name).filter(x => x))];
+      sel.innerHTML = '<option value="">Todas</option>' +
+        devices.map(d => `<option value="${d}">${d}</option>`).join("");
+      if (devices.includes(cur)) sel.value = cur;
+    }
+
+    // ============== Filtragem ==============
+    function getFiltered() {
+      const dev = document.getElementById("filter-device").value;
+      const per = document.getElementById("filter-period").value;
+      let dates = [...new Set(DATA.Dias.map(d => d.date))].sort();
+      if (per !== "all") {
+        const n = parseInt(per, 10);
+        dates = dates.slice(-n);
+      }
+      const dateSet = new Set(dates);
+      const filt = (arr) => arr.filter(x =>
+        dateSet.has(x.date) && (!dev || x.device_name === dev)
+      );
+      return {
+        dates,
+        dias: filt(DATA.Dias),
+        refeicoes: filt(DATA.Refeicoes),
+        exercicios: filt(DATA.Exercicios),
+        cardios: filt(DATA.Cardios),
+      };
+    }
+
+    // ============== Render ==============
+    function render() {
+      const f = getFiltered();
+      const consumedAvg = avg(f.dias.map(x => x.consumed));
+      const burnedAvg = avg(f.dias.map(x => x.burned));
+      const deficitAvg = avg(f.dias.map(x => x.deficit));
+      const daysSaved = f.dias.filter(x => x.saved === "sim" || x.saved === true).length;
+      const totalDays = f.dates.length;
+
+      // Treinos completos: % de séries feitas
+      const totalSets = f.exercicios.reduce((s, x) => s + (Number(x.sets_total) || 0), 0);
+      const doneSets = f.exercicios.reduce((s, x) => s + (Number(x.sets_done) || 0), 0);
+      const trainPct = totalSets > 0 ? Math.round(doneSets * 100 / totalSets) : 0;
+
+      // Macros
+      const pAvg = avg(f.dias.map(x => x.p));
+      const cAvg = avg(f.dias.map(x => x.c));
+      const gAvg = avg(f.dias.map(x => x.g));
+
+      // Cardio total min
+      const cardioMin = f.cardios.reduce((s, x) => s + (Number(x.min) || 0), 0);
+      const cardioKcal = f.cardios.reduce((s, x) => s + (Number(x.kcal) || 0), 0);
+
+      const html = `
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="v" style="color: ${deficitAvg >= 200 && deficitAvg <= 700 ? C.a : deficitAvg < 0 ? C.red : C.yellow}">${Math.round(deficitAvg)}</div>
+            <div class="l">Déficit médio/dia</div>
+            <div class="sub">${deficitAvg < 0 ? "Superávit" : (deficitAvg < 200 ? "Abaixo da meta" : (deficitAvg > 700 ? "Agressivo" : "Na meta"))}</div>
+          </div>
+          <div class="kpi">
+            <div class="v" style="color: ${C.a3}">${Math.round(consumedAvg)}</div>
+            <div class="l">Consumido médio</div>
+            <div class="sub">kcal/dia</div>
+          </div>
+          <div class="kpi">
+            <div class="v" style="color: ${C.blue}">${Math.round(burnedAvg)}</div>
+            <div class="l">Queimado médio</div>
+            <div class="sub">kcal/dia</div>
+          </div>
+          <div class="kpi">
+            <div class="v" style="color: ${trainPct >= 80 ? C.a : trainPct >= 50 ? C.yellow : C.red}">${trainPct}%</div>
+            <div class="l">Treinos completos</div>
+            <div class="sub">${doneSets}/${totalSets} séries</div>
+          </div>
+          <div class="kpi">
+            <div class="v" style="color: ${C.a}">${daysSaved}/${totalDays}</div>
+            <div class="l">Dias registrados</div>
+            <div class="sub">${totalDays > 0 ? Math.round(daysSaved * 100 / totalDays) : 0}% consistência</div>
+          </div>
+          <div class="kpi">
+            <div class="v" style="color: ${C.blue}">${Math.round(cardioMin)}</div>
+            <div class="l">Min cardio total</div>
+            <div class="sub">${Math.round(cardioKcal)} kcal queim.</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h2>Balanço calórico por dia</h2>
+            <div class="chart-wrap"><canvas id="chart-balanco"></canvas></div>
+          </div>
+          <div class="card">
+            <h2>Macros médios (g/dia)</h2>
+            <div class="chart-wrap"><canvas id="chart-macros"></canvas></div>
+            <div class="hint">Média da pessoa filtrada. Recomendado: P~150g, C~250g, G~60g em déficit moderado.</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h2>% Treino completo por dia</h2>
+            <div class="chart-wrap"><canvas id="chart-train"></canvas></div>
+          </div>
+          <div class="card">
+            <h2>Cardio: minutos por tipo</h2>
+            <div class="chart-wrap"><canvas id="chart-cardio"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 18px;">
+          <h2>Histórico diário</h2>
+          <div style="overflow-x: auto;">
+            <table id="table-dias">
+              <thead>
+                <tr>
+                  <th>Data</th><th>Dia</th><th>Treino</th><th>Pessoa</th>
+                  <th class="num">Consumido</th><th class="num">Queimado</th><th class="num">Déficit</th>
+                  <th class="num">Treino %</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h2>Refeições com avaliação da IA</h2>
+            <div style="margin-bottom: 8px; font-size: 11px; color: var(--m);">Últimas 12 refeições analisadas</div>
+            <div id="meals-list"></div>
+          </div>
+          <div class="card">
+            <h2>Exercícios mais pulados</h2>
+            <div style="overflow-x: auto;">
+              <table id="table-skip">
+                <thead>
+                  <tr><th>Exercício</th><th class="num">Vezes pulado</th><th class="num">% feito</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById("content").innerHTML = html;
+
+      renderChartBalanco(f);
+      renderChartMacros(pAvg, cAvg, gAvg);
+      renderChartTrain(f);
+      renderChartCardio(f);
+      renderTableDias(f);
+      renderMealsList(f);
+      renderTableSkip(f);
+    }
+
+    // ============== Charts ==============
+    function destroyChart(name) {
+      if (CHARTS[name]) { CHARTS[name].destroy(); delete CHARTS[name]; }
+    }
+
+    function chartTheme() {
+      return {
+        plugins: {
+          legend: { labels: { color: C.t, font: { size: 11 } } },
+          tooltip: { backgroundColor: C.c1, borderColor: C.b, borderWidth: 1 },
+        },
+        scales: {
+          x: { ticks: { color: C.m, font: { size: 10 } }, grid: { color: C.b + "55" } },
+          y: { ticks: { color: C.m, font: { size: 10 } }, grid: { color: C.b + "55" } },
+        },
+        responsive: true, maintainAspectRatio: false,
+      };
+    }
+
+    function renderChartBalanco(f) {
+      destroyChart("balanco");
+      const ctx = document.getElementById("chart-balanco");
+      const byDate = {};
+      f.dias.forEach(d => {
+        if (!byDate[d.date]) byDate[d.date] = { consumed: 0, burned: 0, deficit: 0, n: 0 };
+        byDate[d.date].consumed += Number(d.consumed) || 0;
+        byDate[d.date].burned += Number(d.burned) || 0;
+        byDate[d.date].deficit += Number(d.deficit) || 0;
+        byDate[d.date].n++;
+      });
+      const labels = f.dates.map(d => d.slice(5));
+      const consumed = f.dates.map(d => byDate[d] ? byDate[d].consumed / byDate[d].n : 0);
+      const burned = f.dates.map(d => byDate[d] ? byDate[d].burned / byDate[d].n : 0);
+      const deficit = f.dates.map(d => byDate[d] ? byDate[d].deficit / byDate[d].n : 0);
+      CHARTS.balanco = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "Consumido", data: consumed, backgroundColor: C.a3 },
+            { label: "Queimado", data: burned, backgroundColor: C.blue },
+            { label: "Déficit", data: deficit, backgroundColor: C.a, type: "line", borderColor: C.a, tension: 0.3, yAxisID: "y" },
+          ],
+        },
+        options: { ...chartTheme() },
+      });
+    }
+
+    function renderChartMacros(p, c, g) {
+      destroyChart("macros");
+      const ctx = document.getElementById("chart-macros");
+      CHARTS.macros = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+          labels: [`Proteína (${Math.round(p)}g)`, `Carbo (${Math.round(c)}g)`, `Gordura (${Math.round(g)}g)`],
+          datasets: [{ data: [p, c, g], backgroundColor: [C.red, C.yellow, C.blue] }],
+        },
+        options: {
+          plugins: { legend: { labels: { color: C.t, font: { size: 11 } } } },
+          responsive: true, maintainAspectRatio: false,
+        },
+      });
+    }
+
+    function renderChartTrain(f) {
+      destroyChart("train");
+      const ctx = document.getElementById("chart-train");
+      const byDate = {};
+      f.exercicios.forEach(x => {
+        if (!byDate[x.date]) byDate[x.date] = { tot: 0, done: 0 };
+        byDate[x.date].tot += Number(x.sets_total) || 0;
+        byDate[x.date].done += Number(x.sets_done) || 0;
+      });
+      const labels = f.dates.map(d => d.slice(5));
+      const pct = f.dates.map(d => byDate[d] && byDate[d].tot > 0 ? Math.round(byDate[d].done * 100 / byDate[d].tot) : 0);
+      CHARTS.train = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "% séries feitas",
+            data: pct,
+            backgroundColor: pct.map(v => v >= 80 ? C.a : v >= 50 ? C.yellow : v > 0 ? C.a3 : C.b),
+          }],
+        },
+        options: {
+          ...chartTheme(),
+          scales: {
+            ...chartTheme().scales,
+            y: { ...chartTheme().scales.y, max: 100, beginAtZero: true },
+          },
+        },
+      });
+    }
+
+    function renderChartCardio(f) {
+      destroyChart("cardio");
+      const ctx = document.getElementById("chart-cardio");
+      const byType = {};
+      f.cardios.forEach(c => {
+        if (!c.type) return;
+        byType[c.type] = (byType[c.type] || 0) + (Number(c.min) || 0);
+      });
+      const labels = Object.keys(byType);
+      const data = Object.values(byType);
+      CHARTS.cardio = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Minutos",
+            data,
+            backgroundColor: [C.a, C.blue, C.yellow, C.a3, C.red],
+          }],
+        },
+        options: {
+          ...chartTheme(),
+          indexAxis: "y",
+        },
+      });
+    }
+
+    function renderTableDias(f) {
+      const tb = document.querySelector("#table-dias tbody");
+      const byDateAndDevice = {};
+      f.dias.forEach(d => {
+        const k = d.date + "|" + d.device_name;
+        byDateAndDevice[k] = d;
+      });
+      const exByDate = {};
+      f.exercicios.forEach(x => {
+        const k = x.date + "|" + x.device_name;
+        if (!exByDate[k]) exByDate[k] = { tot: 0, done: 0 };
+        exByDate[k].tot += Number(x.sets_total) || 0;
+        exByDate[k].done += Number(x.sets_done) || 0;
+      });
+      const wd = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+      const sorted = Object.keys(byDateAndDevice).sort().reverse();
+      tb.innerHTML = sorted.map(k => {
+        const d = byDateAndDevice[k];
+        const ex = exByDate[k] || { tot: 0, done: 0 };
+        const pct = ex.tot > 0 ? Math.round(ex.done * 100 / ex.tot) : 0;
+        const dt = new Date(d.date + "T12:00:00");
+        const def = Number(d.deficit) || 0;
+        const defClass = def < 0 ? "red" : def >= 200 && def <= 700 ? "green" : "blue";
+        const defStatus = def < 0 ? "Superávit" : def < 200 ? "Abaixo" : def > 700 ? "Agressivo" : "Na meta";
+        const defPill = def < 0 ? "bad" : def >= 200 && def <= 700 ? "ok" : def > 700 ? "info" : "warn";
+        const isSaved = d.saved === "sim" || d.saved === true;
+        return `
+          <tr>
+            <td>${d.date}</td>
+            <td>${wd[dt.getDay()]}</td>
+            <td>${(d.label || "").substring(0, 30)}</td>
+            <td>${d.device_name}</td>
+            <td class="num">${Math.round(d.consumed)}</td>
+            <td class="num">${Math.round(d.burned)}</td>
+            <td class="num ${defClass}">${Math.round(def)}</td>
+            <td class="num">${ex.tot > 0 ? pct + "%" : "—"}</td>
+            <td><span class="pill ${defPill}">${isSaved ? defStatus : "Vazio"}</span></td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderMealsList(f) {
+      const list = document.getElementById("meals-list");
+      const meals = f.refeicoes
+        .filter(m => Number(m.kcal) > 0 && m.assessment)
+        .sort((a, b) => b.date.localeCompare(a.date) || (Number(a.idx) - Number(b.idx)))
+        .slice(0, 12);
+      if (meals.length === 0) {
+        list.innerHTML = '<div style="color: var(--m); font-size: 11px;">Nenhuma refeição com análise da IA ainda.</div>';
+        return;
+      }
+      list.innerHTML = meals.map(m => {
+        const a = String(m.assessment || "").toLowerCase();
+        const cls = a.includes("ok") || a.includes("adequad") ? "ok" :
+                    a.includes("inadeq") || a.includes("excess") || a.includes("acima") ? "bad" : "warn";
+        return `
+          <div class="meal-card">
+            <div class="meal-head">
+              <span class="meal-name">${m.date.slice(5)} · ${m.name}</span>
+              <span class="meal-kcal">${Math.round(m.kcal)} kcal</span>
+            </div>
+            <div style="font-size: 10px; color: var(--m); margin-bottom: 4px;">${m.foods || ""}</div>
+            <div><span class="pill ${cls}">${m.assessment}</span></div>
+            ${m.tip ? `<div class="meal-tip">${m.tip}</div>` : ""}
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderTableSkip(f) {
+      const tb = document.querySelector("#table-skip tbody");
+      const stats = {};
+      f.exercicios.forEach(x => {
+        if (x.extra === "sim") return; // só prescritos
+        const n = x.name;
+        if (!stats[n]) stats[n] = { tot: 0, doneSets: 0, totalSets: 0, days: 0, daysAny: 0 };
+        stats[n].days++;
+        const total = Number(x.sets_total) || 0;
+        const done = Number(x.sets_done) || 0;
+        stats[n].totalSets += total;
+        stats[n].doneSets += done;
+        if (done > 0) stats[n].daysAny++;
+      });
+      const arr = Object.keys(stats).map(n => ({
+        name: n,
+        days: stats[n].days,
+        daysAny: stats[n].daysAny,
+        skipped: stats[n].days - stats[n].daysAny,
+        pct: stats[n].totalSets > 0 ? Math.round(stats[n].doneSets * 100 / stats[n].totalSets) : 0,
+      })).sort((a, b) => b.skipped - a.skipped || a.pct - b.pct).slice(0, 12);
+      tb.innerHTML = arr.map(x => {
+        const cls = x.pct >= 80 ? "green" : x.pct >= 50 ? "" : "red";
+        return `
+          <tr>
+            <td>${x.name}</td>
+            <td class="num">${x.skipped}/${x.days}</td>
+            <td class="num ${cls}">${x.pct}%</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // ============== Helpers ==============
+    function avg(arr) {
+      const valid = arr.filter(v => typeof v === "number" && !isNaN(v));
+      if (valid.length === 0) return 0;
+      return valid.reduce((s, v) => s + v, 0) / valid.length;
+    }
+
+    // ============== Wire ==============
+    document.getElementById("btn-refresh").onclick = loadAll;
+    document.getElementById("filter-device").onchange = render;
+    document.getElementById("filter-period").onchange = render;
+    loadAll();
+  </script>
+</body>
+</html>
