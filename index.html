@@ -34,6 +34,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body>
   <div id="root"><div class="app-loading">CARREGANDO...</div></div>
@@ -50,6 +51,8 @@
     PROXY_URL: "https://diariofit-proxy.romarioproxxima.workers.dev",
     SYNC_URL: "",
     DEVICE_NAME: "",
+    SHEET_PUB_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8B7ete3JubUTXNvQ_qfMySURPBBi9uPmBtYrguWJEbM61b3XAzB7SAuphq_jPTdUCQXCl0W3yy1GD",
+    SHEET_GIDS: { Dias: 1169272171, Refeicoes: 285727567, Exercicios: 1103996178, Cardios: 889808136 },
     MEAL_NAMES: ["Café da manhã", "Lanche da manhã", "Almoço", "Lanche da tarde", "Jantar"],
     MEAL_TIMES: ["07h-08h", "10h", "11h-12h30", "16h", "19h-20h"],
   };
@@ -700,7 +703,7 @@
 
         {/* Tabs */}
         <div style={{ display: "flex", padding: "10px 12px 0", gap: 2, borderBottom: "1px solid " + C.b, overflowX: "auto" }}>
-          {[["diary", "Diário"], ["hist", "Histórico"], ["plan", "Plano"], ["prog", "Progresso"], ["config", "⚙️"]].map(([id, lb]) => (
+          {[["diary", "Diário"], ["hist", "Histórico"], ["plan", "Plano"], ["dash", "📊"], ["prog", "Progresso"], ["config", "⚙️"]].map(([id, lb]) => (
             <button key={id} onClick={() => setTab(id)} style={tabS(tab === id)}>{lb}</button>
           ))}
         </div>
@@ -717,6 +720,7 @@
           )}
           {tab === "hist" && <HistoryTab hist={hist} />}
           {tab === "plan" && <PlanTab />}
+          {tab === "dash" && <DashboardTab settings={settings} />}
           {tab === "prog" && <ProgressTab {...{ pf, setPf, saveProg, prog, delProgEntry }} />}
           {tab === "config" && <ConfigTab settings={settings} setSettings={(s) => { setSettings(s); saveSettings(s); }} showT={showT} />}
         </div>
@@ -1070,6 +1074,339 @@
             <div style={{ marginTop: 8, background: C.s2, borderRadius: 7, padding: "7px 9px", fontSize: 11, color: C.a }}>{p.c}</div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  // ==================== Dashboard Tab ====================
+  function DashboardTab({ settings }) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [data, setData] = useState({ Dias: [], Refeicoes: [], Exercicios: [], Cardios: [] });
+    const [device, setDevice] = useState("");
+    const [period, setPeriod] = useState("14");
+    const [updated, setUpdated] = useState("");
+    const refBalanco = useRef(null);
+    const refMacros = useRef(null);
+    const refTrain = useRef(null);
+    const chartsRef = useRef({});
+
+    function fetchOne(name, gid) {
+      const url = settings.SHEET_PUB_URL + "/pub?gid=" + gid + "&single=true&output=csv&_=" + Date.now();
+      return fetch(url).then((r) => r.text()).then((t) => {
+        const parsed = window.Papa.parse(t, { header: true, skipEmptyLines: true });
+        return parsed.data.map((row) => {
+          for (const k of Object.keys(row)) {
+            const v = row[k];
+            if (typeof v === "string" && /^-?\d+([.,]\d+)?$/.test(v.trim())) {
+              row[k] = parseFloat(v.replace(",", "."));
+            }
+          }
+          return row;
+        });
+      });
+    }
+
+    async function loadAll() {
+      if (!settings.SHEET_PUB_URL) {
+        setError("Configure a URL pública da planilha em ⚙️");
+        setLoading(false);
+        return;
+      }
+      if (!window.Papa) {
+        setError("Carregando biblioteca... aguarde 2s e clique em ↻");
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError("");
+      try {
+        const gids = settings.SHEET_GIDS || { Dias: 1169272171, Refeicoes: 285727567, Exercicios: 1103996178, Cardios: 889808136 };
+        const [d, r, e, c] = await Promise.all([
+          fetchOne("Dias", gids.Dias),
+          fetchOne("Refeicoes", gids.Refeicoes),
+          fetchOne("Exercicios", gids.Exercicios),
+          fetchOne("Cardios", gids.Cardios),
+        ]);
+        const noTest = (a) => a.filter((x) => x.date && !String(x.device_id || "").startsWith("test"));
+        setData({
+          Dias: noTest(d), Refeicoes: noTest(r),
+          Exercicios: noTest(e), Cardios: noTest(c),
+        });
+        setUpdated(new Date().toLocaleString("pt-BR"));
+      } catch (err) {
+        setError("Erro: " + (err && err.message ? err.message : String(err)));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, []);
+
+    const filtered = useMemo(() => {
+      let dates = [...new Set(data.Dias.map((d) => d.date))].sort();
+      if (period !== "all") dates = dates.slice(-parseInt(period, 10));
+      const dateSet = new Set(dates);
+      const filt = (arr) => arr.filter((x) =>
+        dateSet.has(x.date) && (!device || x.device_name === device)
+      );
+      return {
+        dates,
+        dias: filt(data.Dias), refeicoes: filt(data.Refeicoes),
+        exercicios: filt(data.Exercicios), cardios: filt(data.Cardios),
+      };
+    }, [data, device, period]);
+
+    function avg(arr) {
+      const v = arr.filter((x) => typeof x === "number" && !isNaN(x));
+      return v.length === 0 ? 0 : v.reduce((s, x) => s + x, 0) / v.length;
+    }
+
+    const f = filtered;
+    const consumedAvg = avg(f.dias.map((x) => x.consumed));
+    const burnedAvg = avg(f.dias.map((x) => x.burned));
+    const deficitAvg = avg(f.dias.map((x) => x.deficit));
+    const daysSaved = f.dias.filter((x) => x.saved === "sim" || x.saved === true).length;
+    const totalDays = f.dates.length;
+    const totalSets = f.exercicios.reduce((s, x) => s + (Number(x.sets_total) || 0), 0);
+    const doneSets = f.exercicios.reduce((s, x) => s + (Number(x.sets_done) || 0), 0);
+    const trainPct = totalSets > 0 ? Math.round(doneSets * 100 / totalSets) : 0;
+    const cardioMin = f.cardios.reduce((s, x) => s + (Number(x.min) || 0), 0);
+    const cardioKcal = f.cardios.reduce((s, x) => s + (Number(x.kcal) || 0), 0);
+    const pAvg = avg(f.dias.map((x) => x.p));
+    const cAvg = avg(f.dias.map((x) => x.c));
+    const gAvg = avg(f.dias.map((x) => x.g));
+    const devices = [...new Set(data.Dias.map((d) => d.device_name).filter((x) => x))];
+
+    // Charts
+    useEffect(() => {
+      function destroy(k) { if (chartsRef.current[k]) { chartsRef.current[k].destroy(); delete chartsRef.current[k]; } }
+      function theme() {
+        return {
+          plugins: { legend: { labels: { color: C.t, font: { size: 10 } } }, tooltip: { backgroundColor: C.c, borderColor: C.b, borderWidth: 1 } },
+          scales: { x: { ticks: { color: C.m, font: { size: 9 } }, grid: { color: C.b + "55" } }, y: { ticks: { color: C.m, font: { size: 9 } }, grid: { color: C.b + "55" } } },
+          responsive: true, maintainAspectRatio: false,
+        };
+      }
+      if (refBalanco.current && f.dates.length > 0) {
+        destroy("balanco");
+        const byDate = {};
+        f.dias.forEach((d) => {
+          if (!byDate[d.date]) byDate[d.date] = { c: 0, b: 0, dt: 0, n: 0 };
+          byDate[d.date].c += Number(d.consumed) || 0;
+          byDate[d.date].b += Number(d.burned) || 0;
+          byDate[d.date].dt += Number(d.deficit) || 0;
+          byDate[d.date].n++;
+        });
+        const labels = f.dates.map((d) => d.slice(5));
+        chartsRef.current.balanco = new Chart(refBalanco.current, {
+          type: "bar",
+          data: { labels, datasets: [
+            { label: "Consumido", data: f.dates.map((d) => byDate[d] ? byDate[d].c / byDate[d].n : 0), backgroundColor: C.a3 },
+            { label: "Queimado", data: f.dates.map((d) => byDate[d] ? byDate[d].b / byDate[d].n : 0), backgroundColor: C.blue },
+            { label: "Déficit", data: f.dates.map((d) => byDate[d] ? byDate[d].dt / byDate[d].n : 0), backgroundColor: C.a, type: "line", borderColor: C.a, tension: 0.3 },
+          ] },
+          options: theme(),
+        });
+      }
+      if (refMacros.current) {
+        destroy("macros");
+        chartsRef.current.macros = new Chart(refMacros.current, {
+          type: "doughnut",
+          data: { labels: ["Proteína " + Math.round(pAvg) + "g", "Carbo " + Math.round(cAvg) + "g", "Gordura " + Math.round(gAvg) + "g"],
+            datasets: [{ data: [pAvg, cAvg, gAvg], backgroundColor: [C.red, C.yellow, C.blue] }] },
+          options: { plugins: { legend: { labels: { color: C.t, font: { size: 10 } } } }, responsive: true, maintainAspectRatio: false },
+        });
+      }
+      if (refTrain.current && f.dates.length > 0) {
+        destroy("train");
+        const byDate = {};
+        f.exercicios.forEach((x) => {
+          if (!byDate[x.date]) byDate[x.date] = { tot: 0, done: 0 };
+          byDate[x.date].tot += Number(x.sets_total) || 0;
+          byDate[x.date].done += Number(x.sets_done) || 0;
+        });
+        const labels = f.dates.map((d) => d.slice(5));
+        const pct = f.dates.map((d) => byDate[d] && byDate[d].tot > 0 ? Math.round(byDate[d].done * 100 / byDate[d].tot) : 0);
+        chartsRef.current.train = new Chart(refTrain.current, {
+          type: "bar",
+          data: { labels, datasets: [{ label: "% séries feitas", data: pct,
+            backgroundColor: pct.map((v) => v >= 80 ? C.a : v >= 50 ? C.yellow : v > 0 ? C.a3 : C.b) }] },
+          options: { ...theme(), scales: { ...theme().scales, y: { ...theme().scales.y, max: 100, beginAtZero: true } } },
+        });
+      }
+      return () => { Object.keys(chartsRef.current).forEach(destroy); };
+    }, [f.dates.join(","), device, period]);
+
+    const meals = f.refeicoes
+      .filter((m) => Number(m.kcal) > 0 && m.assessment)
+      .sort((a, b) => b.date.localeCompare(a.date) || (Number(a.idx) - Number(b.idx)))
+      .slice(0, 8);
+
+    const skipStats = {};
+    f.exercicios.forEach((x) => {
+      if (x.extra === "sim") return;
+      const n = x.name;
+      if (!skipStats[n]) skipStats[n] = { totalSets: 0, doneSets: 0, days: 0, daysAny: 0 };
+      skipStats[n].days++;
+      skipStats[n].totalSets += Number(x.sets_total) || 0;
+      skipStats[n].doneSets += Number(x.sets_done) || 0;
+      if ((Number(x.sets_done) || 0) > 0) skipStats[n].daysAny++;
+    });
+    const skipArr = Object.keys(skipStats).map((n) => ({
+      name: n, days: skipStats[n].days, skipped: skipStats[n].days - skipStats[n].daysAny,
+      pct: skipStats[n].totalSets > 0 ? Math.round(skipStats[n].doneSets * 100 / skipStats[n].totalSets) : 0,
+    })).sort((a, b) => b.skipped - a.skipped || a.pct - b.pct).slice(0, 8);
+
+    const wd = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const recentDays = [...f.dias].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+
+    return (
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: C.t }}>📊 DASHBOARD</div>
+          <button onClick={loadAll} style={{ background: C.a, color: C.bg, border: "none", borderRadius: 7, padding: "6px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>↻</button>
+        </div>
+        {updated && <div style={{ fontSize: 9, color: C.m, marginBottom: 10 }}>Atualizado: {updated}</div>}
+        {loading && <div style={{ textAlign: "center", padding: 30, color: C.m }}>Carregando dados...</div>}
+        {error && <div style={{ background: "#e74c3c15", border: "1px solid " + C.red, color: C.red, padding: 10, borderRadius: 8, marginBottom: 10, fontSize: 11 }}>{error}</div>}
+
+        {!loading && !error && (
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+              <select value={device} onChange={(e) => setDevice(e.target.value)} style={inpS}>
+                <option value="">Todas pessoas</option>
+                {devices.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select value={period} onChange={(e) => setPeriod(e.target.value)} style={inpS}>
+                <option value="7">Últimos 7d</option>
+                <option value="14">Últimos 14d</option>
+                <option value="30">Últimos 30d</option>
+                <option value="all">Tudo</option>
+              </select>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
+              <div style={{ background: C.s2, borderRadius: 9, padding: "10px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: deficitAvg >= 200 && deficitAvg <= 700 ? C.a : deficitAvg < 0 ? C.red : C.yellow, lineHeight: 1 }}>{Math.round(deficitAvg)}</div>
+                <div style={{ fontSize: 8, color: C.m, marginTop: 3, letterSpacing: 0.5 }}>DÉF MÉDIO</div>
+              </div>
+              <div style={{ background: C.s2, borderRadius: 9, padding: "10px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: trainPct >= 80 ? C.a : trainPct >= 50 ? C.yellow : C.red, lineHeight: 1 }}>{trainPct}%</div>
+                <div style={{ fontSize: 8, color: C.m, marginTop: 3 }}>TREINO</div>
+              </div>
+              <div style={{ background: C.s2, borderRadius: 9, padding: "10px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: C.a, lineHeight: 1 }}>{daysSaved}/{totalDays}</div>
+                <div style={{ fontSize: 8, color: C.m, marginTop: 3 }}>DIAS REG.</div>
+              </div>
+              <div style={{ background: C.s2, borderRadius: 9, padding: "10px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: C.a3, lineHeight: 1 }}>{Math.round(consumedAvg)}</div>
+                <div style={{ fontSize: 8, color: C.m, marginTop: 3 }}>KCAL CONS</div>
+              </div>
+              <div style={{ background: C.s2, borderRadius: 9, padding: "10px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: C.blue, lineHeight: 1 }}>{Math.round(burnedAvg)}</div>
+                <div style={{ fontSize: 8, color: C.m, marginTop: 3 }}>KCAL QUEIM</div>
+              </div>
+              <div style={{ background: C.s2, borderRadius: 9, padding: "10px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: C.blue, lineHeight: 1 }}>{Math.round(cardioMin)}</div>
+                <div style={{ fontSize: 8, color: C.m, marginTop: 3 }}>MIN CARDIO</div>
+              </div>
+            </div>
+
+            <div style={boxS}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.a, marginBottom: 8, letterSpacing: 0.5 }}>BALANÇO POR DIA</div>
+              <div style={{ height: 200, position: "relative" }}><canvas ref={refBalanco}></canvas></div>
+            </div>
+
+            <div style={boxS}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.a, marginBottom: 8 }}>% TREINO COMPLETO POR DIA</div>
+              <div style={{ height: 180, position: "relative" }}><canvas ref={refTrain}></canvas></div>
+            </div>
+
+            <div style={boxS}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.a, marginBottom: 8 }}>MACROS MÉDIOS</div>
+              <div style={{ height: 200, position: "relative" }}><canvas ref={refMacros}></canvas></div>
+            </div>
+
+            <div style={boxS}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.a, marginBottom: 8 }}>HISTÓRICO RECENTE</div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ color: C.m }}>
+                      <th style={{ textAlign: "left", padding: 4 }}>Data</th>
+                      <th style={{ textAlign: "left", padding: 4 }}>Treino</th>
+                      <th style={{ textAlign: "right", padding: 4 }}>Cons</th>
+                      <th style={{ textAlign: "right", padding: 4 }}>Quei</th>
+                      <th style={{ textAlign: "right", padding: 4 }}>Déf</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentDays.map((d, i) => {
+                      const dt = new Date(d.date + "T12:00:00");
+                      const def = Number(d.deficit) || 0;
+                      const col = def < 0 ? C.red : def >= 200 && def <= 700 ? C.a : C.blue;
+                      return (
+                        <tr key={i} style={{ borderTop: "1px solid " + C.b }}>
+                          <td style={{ padding: 4 }}>{d.date.slice(5)} {wd[dt.getDay()]}</td>
+                          <td style={{ padding: 4, color: C.m }}>{(d.label || "").substring(0, 18)}</td>
+                          <td style={{ padding: 4, textAlign: "right", color: C.a3 }}>{Math.round(d.consumed) || "-"}</td>
+                          <td style={{ padding: 4, textAlign: "right", color: C.blue }}>{Math.round(d.burned) || "-"}</td>
+                          <td style={{ padding: 4, textAlign: "right", color: col, fontWeight: 700 }}>{Math.round(def)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {meals.length > 0 && (
+              <div style={boxS}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.a, marginBottom: 8 }}>REFEIÇÕES — IA RECENTES</div>
+                {meals.map((m, i) => {
+                  const a = String(m.assessment || "").toLowerCase();
+                  const cl = a.includes("ok") || a.includes("adequad") ? C.a : a.includes("inadeq") || a.includes("excess") || a.includes("acima") ? C.red : C.yellow;
+                  return (
+                    <div key={i} style={{ background: C.s2, borderRadius: 7, padding: 8, marginBottom: 5, fontSize: 11 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                        <strong>{m.date.slice(5)} · {m.name}</strong>
+                        <span style={{ color: C.a, fontWeight: 700 }}>{Math.round(m.kcal)} kcal</span>
+                      </div>
+                      <div style={{ fontSize: 9, color: C.m, marginBottom: 3 }}>{m.foods}</div>
+                      <span style={{ background: cl + "25", color: cl, padding: "1px 6px", borderRadius: 8, fontSize: 9, fontWeight: 700 }}>{m.assessment}</span>
+                      {m.tip && <div style={{ fontSize: 9, color: C.m, marginTop: 4, lineHeight: 1.4 }}>{m.tip}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {skipArr.length > 0 && (
+              <div style={boxS}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.a, marginBottom: 8 }}>EXERCÍCIOS MAIS PULADOS</div>
+                <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ color: C.m }}>
+                      <th style={{ textAlign: "left", padding: 4 }}>Exercício</th>
+                      <th style={{ textAlign: "right", padding: 4 }}>Pulado</th>
+                      <th style={{ textAlign: "right", padding: 4 }}>% feito</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {skipArr.map((x, i) => (
+                      <tr key={i} style={{ borderTop: "1px solid " + C.b }}>
+                        <td style={{ padding: 4 }}>{x.name}</td>
+                        <td style={{ padding: 4, textAlign: "right" }}>{x.skipped}/{x.days}</td>
+                        <td style={{ padding: 4, textAlign: "right", color: x.pct >= 80 ? C.a : x.pct >= 50 ? C.yellow : C.red, fontWeight: 700 }}>{x.pct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
