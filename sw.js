@@ -2,7 +2,7 @@
 // Cache do app shell pra funcionar offline.
 // Estratégia: stale-while-revalidate pros assets estáticos, network-first pra análise de IA.
 
-const VERSION = "v2.4.0";
+const VERSION = "v2.5.0";
 const CACHE = "diariofit-" + VERSION;
 
 const SHELL = [
@@ -14,6 +14,7 @@ const SHELL = [
   "https://unpkg.com/@babel/standalone/babel.min.js",
   "https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js",
   "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js",
+  "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -62,6 +63,4 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Permite mensagens pra forçar update
-self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") self.skipWaiting();
-});
+self.addEventListener("message", (event)
